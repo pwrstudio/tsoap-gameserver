@@ -4,14 +4,21 @@ import EasyStar from 'easystarjs'
 import fs from 'fs';
 import get from 'lodash/get'
 
-const rawdata = fs.readFileSync('hkw-map-array-small-blur.json');
+const rawdata = fs.readFileSync('hkw-map-color-2.json');
 let mapMatrix = JSON.parse(rawdata.toString()).data;
 
 // console.dir(mapMatrix)
 
+// 0 = white
+// 1 = black
+// 2 = yellow
+// 3 = red
+// 4 = green
+// 5 = blue
+
 let easystar = new EasyStar.js();
 easystar.setGrid(mapMatrix)
-easystar.setAcceptableTiles([0]);
+easystar.setAcceptableTiles([0, 2, 3, 4, 5]);
 // easystar.setTileCost(1, 10000);
 // easystar.setIterationsPerCalculation(1000);
 easystar.enableDiagonals();
@@ -40,6 +47,7 @@ class Player extends Schema {
   @type("string") tint: string;
   @type("number") x: number;
   @type("number") y: number;
+  @type("number") area: number;
   @type(Path) path: Path = new Path();
 }
 
@@ -104,7 +112,7 @@ export class GameRoom extends Room {
       // console.log('[Y][X] => mapMatrix[' + roundedY / 10 + '][' + roundedX / 10 + '] => ' + mapMatrix[roundedY / 10][roundedX / 10])
       console.log('- - - - - ')
 
-      if (mapMatrix[roundedY / 10][roundedX / 10] === 0) {
+      if (mapMatrix[roundedY / 10][roundedX / 10] !== 1) {
 
         // let grid = new PF.Grid(mapMatrix);
 
@@ -149,6 +157,8 @@ export class GameRoom extends Room {
                 tempWp.x = wp.x * 10
                 this.state.players[client.sessionId].path.waypoints.push(tempWp)
               })
+              this.state.players[client.sessionId].area = mapMatrix[path[path.length - 1].y][path[path.length - 1].x]
+              console.log('AREA:', mapMatrix[path[path.length - 1].y][path[path.length - 1].x])
             }
           });
 
@@ -171,7 +181,7 @@ export class GameRoom extends Room {
     while (true) {
       startX = Math.ceil((Math.floor(Math.random() * (4950 - 50 + 1)) + 50) / 10) * 10;
       startY = Math.ceil((Math.floor(Math.random() * (4950 - 50 + 1)) + 50) / 10) * 10;
-      if (mapMatrix[startY / 10][startX / 10] === 0) break;
+      if (mapMatrix[startY / 10][startX / 10] !== 1) break;
     }
 
     this.state.players[client.sessionId] = new Player();
@@ -180,6 +190,7 @@ export class GameRoom extends Room {
     this.state.players[client.sessionId].uuid = options.uuid;
     this.state.players[client.sessionId].x = startX
     this.state.players[client.sessionId].y = startY
+    this.state.players[client.sessionId].area = mapMatrix[startY / 10][startX / 10]
   }
 
   onLeave(client: Client, consented: boolean) {

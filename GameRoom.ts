@@ -4,7 +4,7 @@ import EasyStar from 'easystarjs'
 import fs from 'fs';
 import get from 'lodash/get'
 
-const rawdata = fs.readFileSync('hkw-map-color-2.json');
+const rawdata = fs.readFileSync('hkw-map-color-hard.json');
 let mapMatrix = JSON.parse(rawdata.toString()).data;
 
 // console.dir(mapMatrix)
@@ -45,6 +45,9 @@ class Player extends Schema {
   @type("string") uuid: string;
   @type("string") name: string;
   @type("string") tint: string;
+  @type("string") ip: string;
+  @type("number") avatar: number;
+  @type("boolean") connected: boolean;
   @type("number") x: number;
   @type("number") y: number;
   @type("number") area: number;
@@ -56,6 +59,7 @@ class State extends Schema {
 }
 
 export class GameRoom extends Room {
+
 
   onCreate(options: any) {
 
@@ -172,6 +176,10 @@ export class GameRoom extends Room {
 
   }
 
+  onAuth(client: Client, options: any, request: any) {
+    return (options.ip = request.connection.remoteAddress);
+  }
+
   onJoin(client: Client, options: any) {
     console.dir(options);
 
@@ -188,13 +196,37 @@ export class GameRoom extends Room {
     this.state.players[client.sessionId].tint = options.tint;
     this.state.players[client.sessionId].name = options.name;
     this.state.players[client.sessionId].uuid = options.uuid;
+    this.state.players[client.sessionId].ip = options.ip;
+    this.state.players[client.sessionId].avatar = options.avatar;
+    this.state.players[client.sessionId].connected = true;
     this.state.players[client.sessionId].x = startX
     this.state.players[client.sessionId].y = startY
     this.state.players[client.sessionId].area = mapMatrix[startY / 10][startX / 10]
   }
 
-  onLeave(client: Client, consented: boolean) {
+  async onLeave(client: Client, consented: boolean) {
+    // // flag client as inactive for other users
+    // this.state.players[client.sessionId].connected = false;
     delete this.state.players[client.sessionId];
+
+    // try {
+    //   if (consented) {
+    //     throw new Error("consented leave");
+    //   }
+
+    //   console.log('allow reconnection of:', this.state.players[client.sessionId].name)
+
+    //   // allow disconnected client to reconnect into this room until 20 seconds
+    //   await this.allowReconnection(client, 10);
+
+    //   // client returned! let's re-activate it.
+    //   this.state.players[client.sessionId].connected = true;
+
+    // } catch (e) {
+    //   console.log('time expired for:', this.state.players[client.sessionId].name)
+    //   // 20 seconds expired. let's remove the client.
+    //   delete this.state.players[client.sessionId];
+    // }
   }
 
   // onDispose() {

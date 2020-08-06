@@ -3,7 +3,10 @@ import express from "express";
 import cors from "cors";
 import { Server } from "colyseus";
 import { monitor } from "@colyseus/monitor";
+import * as Sentry from '@sentry/node';
 // import socialRoutes from "@colyseus/social/express"
+
+Sentry.init({ dsn: 'https://53649fd6370545159443264caa8cc0ff@o65254.ingest.sentry.io/5377429' });
 
 import { GameRoom } from "./GameRoom";
 import { ChatRoom } from "./ChatRoom";

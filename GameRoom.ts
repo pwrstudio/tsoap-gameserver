@@ -32,6 +32,10 @@ easystar.disableCornerCutting()
 //   console.log(student);
 // });
 
+class IP extends Schema {
+  @type("string") address: string;
+}
+
 class Waypoint extends Schema {
   @type("number") x: number;
   @type("number") y: number;
@@ -56,6 +60,7 @@ class Player extends Schema {
 }
 
 class State extends Schema {
+  @type([IP]) blacklist = new ArraySchema<IP>();
   @type({ map: Player }) players = new MapSchema();
 }
 
@@ -101,6 +106,35 @@ export class GameRoom extends Room {
     //     this.state.players[client.sessionId].x += 5
     //   }
     // });
+
+    this.onMessage("blacklist", (client, payload) => {
+      console.dir(payload)
+      if (!this.state.blacklist.find((ip: IP) => ip.address == payload.address)) {
+        let newIP = new IP()
+        newIP.address = payload.address
+        this.state.blacklist.push(newIP);
+        for (let key in this.state.players) {
+          if (this.state.players[key].ip == newIP.address) {
+            let bannedClient = this.clients.find((c: Client) => c.id === key)
+            if (bannedClient) {
+              console.log('BANNED:', bannedClient.id)
+              bannedClient.send("banned");
+              bannedClient.leave()
+            }
+            delete this.state.players[key]
+          }
+        }
+      }
+    });
+
+    this.onMessage("whitelist", (client, payload) => {
+      console.dir(payload)
+      let newIP = new IP()
+      newIP.address = payload.address
+      const itemIndex = this.state.blacklist.findIndex((ip: IP) => ip === newIP);
+      console.log(itemIndex)
+      this.state.blacklist.splice(itemIndex, 1);
+    });
 
     this.onMessage("go", (client, message) => {
       let roundedX = Math.ceil(get(message, 'x', 0) / 10) * 10
@@ -179,7 +213,12 @@ export class GameRoom extends Room {
   }
 
   onAuth(client: Client, options: any, request: any) {
-    return (options.ip = request.connection.remoteAddress);
+    if (!this.state.blacklist.find((ip: IP) => ip.address == request.connection.remoteAddress)) {
+      return (options.ip = request.connection.remoteAddress);
+    } else {
+      console.log('BANNNEDD')
+      return false
+    }
   }
 
   onJoin(client: Client, options: any) {

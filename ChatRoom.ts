@@ -5,6 +5,10 @@ import get from 'lodash/get'
 
 const MAX_STACK_HEIGHT = 10;
 
+// class IP extends Schema {
+//   @type("string") address: string;
+// }
+
 class Message extends Schema {
   @type("string") msgId: string;
   @type("string") uuid: string;
@@ -14,6 +18,7 @@ class Message extends Schema {
 }
 
 class State extends Schema {
+  // @type([IP]) blacklist = new ArraySchema<IP>();
   @type([Message]) messages = new ArraySchema<Message>();
 }
 

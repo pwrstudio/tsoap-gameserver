@@ -161,8 +161,9 @@ export class GameRoom extends Room {
                 tempWp.x = wp.x * 10
                 this.state.players[client.sessionId].path.waypoints.push(tempWp)
               })
-              this.state.players[client.sessionId].area = mapMatrix[path[path.length - 1].y][path[path.length - 1].x]
-              console.log('AREA:', mapMatrix[path[path.length - 1].y][path[path.length - 1].x])
+              let lastWaypoint = path.slice(-1)[0]
+              this.state.players[client.sessionId].area = mapMatrix[get(lastWaypoint, 'y', 0)][get(lastWaypoint, 'x', 0)]
+              // console.log('AREA:', mapMatrix[path[path.length - 1].y][path[path.length - 1].x])
             }
           });
 

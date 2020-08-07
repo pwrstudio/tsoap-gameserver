@@ -20,6 +20,7 @@ app.use(express.json())
 const server = http.createServer(app);
 const gameServer = new Server({
   server,
+  pingMaxRetries: 10
 });
 
 // register your room handlers

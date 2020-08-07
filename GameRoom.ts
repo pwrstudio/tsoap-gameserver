@@ -42,6 +42,7 @@ class Path extends Schema {
 }
 
 class Player extends Schema {
+  @type("boolean") moderator: boolean;
   @type("string") uuid: string;
   @type("string") name: string;
   @type("string") tint: string;
@@ -184,30 +185,34 @@ export class GameRoom extends Room {
   onJoin(client: Client, options: any) {
     console.dir(options);
 
-    let startX = 0;
-    let startY = 0;
+    if (!options.moderator) {
 
-    while (true) {
-      startX = Math.ceil((Math.floor(Math.random() * (4950 - 50 + 1)) + 50) / 10) * 10;
-      startY = Math.ceil((Math.floor(Math.random() * (4950 - 50 + 1)) + 50) / 10) * 10;
-      if (mapMatrix[startY / 10][startX / 10] !== 1) break;
+      let startX = 0;
+      let startY = 0;
+
+      while (true) {
+        startX = Math.ceil((Math.floor(Math.random() * (4950 - 50 + 1)) + 50) / 10) * 10;
+        startY = Math.ceil((Math.floor(Math.random() * (4950 - 50 + 1)) + 50) / 10) * 10;
+        if (mapMatrix[startY / 10][startX / 10] !== 1) break;
+      }
+
+      this.state.players[client.sessionId] = new Player();
+      this.state.players[client.sessionId].tint = options.tint;
+      this.state.players[client.sessionId].name = options.name;
+      this.state.players[client.sessionId].uuid = options.uuid;
+      this.state.players[client.sessionId].ip = options.ip;
+      this.state.players[client.sessionId].avatar = options.avatar;
+      this.state.players[client.sessionId].connected = true;
+      this.state.players[client.sessionId].x = startX
+      this.state.players[client.sessionId].y = startY
+      this.state.players[client.sessionId].area = mapMatrix[startY / 10][startX / 10]
     }
-
-    this.state.players[client.sessionId] = new Player();
-    this.state.players[client.sessionId].tint = options.tint;
-    this.state.players[client.sessionId].name = options.name;
-    this.state.players[client.sessionId].uuid = options.uuid;
-    this.state.players[client.sessionId].ip = options.ip;
-    this.state.players[client.sessionId].avatar = options.avatar;
-    this.state.players[client.sessionId].connected = true;
-    this.state.players[client.sessionId].x = startX
-    this.state.players[client.sessionId].y = startY
-    this.state.players[client.sessionId].area = mapMatrix[startY / 10][startX / 10]
   }
 
   async onLeave(client: Client, consented: boolean) {
     // // flag client as inactive for other users
     // this.state.players[client.sessionId].connected = false;
+    console.log('Left:', this.state.players[client.sessionId].name)
     delete this.state.players[client.sessionId];
 
     // try {
@@ -215,7 +220,6 @@ export class GameRoom extends Room {
     //     throw new Error("consented leave");
     //   }
 
-    //   console.log('allow reconnection of:', this.state.players[client.sessionId].name)
 
     //   // allow disconnected client to reconnect into this room until 20 seconds
     //   await this.allowReconnection(client, 10);

@@ -43,7 +43,17 @@ export class ChatRoom extends Room {
       this.state.messages.push(newMessage);
     });
 
+    this.onMessage("remove", (client, payload) => {
+      console.log('REMOVE')
+      console.dir(payload)
+      let targetMessageIndex = this.state.messages.findIndex((m: Message) => m.msgId == payload.msgId)
+      console.log(targetMessageIndex)
+      this.state.messages.splice(targetMessageIndex, 1);
+    });
+
   }
+
+
 
   //   onJoin(client: Client, options: any) {
   //     console.log('CHAT')

@@ -232,7 +232,9 @@ export class GameRoom extends Room {
       while (true) {
         startX = Math.ceil((Math.floor(Math.random() * (4950 - 50 + 1)) + 50) / 10) * 10;
         startY = Math.ceil((Math.floor(Math.random() * (4950 - 50 + 1)) + 50) / 10) * 10;
-        if (mapMatrix[startY / 10][startX / 10] !== 1) break;
+        // Spawn all in green area
+        if (mapMatrix[startY / 10][startX / 10] == 4) break;
+        // if (mapMatrix[startY / 10][startX / 10] !== 1) break;
       }
 
       this.state.players[client.sessionId] = new Player();

@@ -1,9 +1,9 @@
-import { Room, Client } from "colyseus";
+import { Room } from "colyseus";
 import { Schema, ArraySchema, type } from "@colyseus/schema";
 import get from 'lodash/get'
+import * as Sentry from '@sentry/node';
 
-
-const MAX_STACK_HEIGHT = 10;
+const MAX_STACK_HEIGHT = 200;
 
 // class IP extends Schema {
 //   @type("string") address: string;
@@ -31,39 +31,32 @@ export class ChatRoom extends Room {
     this.setState(new State());
 
     this.onMessage("submit", (client, payload) => {
-      // console.log('this.state.messages.length', this.state.messages.length)
-      // console.dir(this.state.messages)
-      // if (this.state.messages.length > MAX_STACK_HEIGHT) this.state.messages.splice(0, 1);
-      let newMessage = new Message()
-      newMessage.msgId = get(payload, 'msgId', "No msgId")
-      newMessage.text = get(payload, 'text', "No text")
-      newMessage.name = get(payload, 'name', "No name")
-      newMessage.uuid = get(payload, 'uuid', "No UUID")
-      newMessage.tint = get(payload, 'tint', "No tint")
-      this.state.messages.push(newMessage);
+      try {
+        if (this.state.messages.length > MAX_STACK_HEIGHT) {
+          this.state.messages.splice(0, 1);
+        }
+        let newMessage = new Message()
+        newMessage.msgId = get(payload, 'msgId', "No msgId")
+        newMessage.text = get(payload, 'text', "No text")
+        newMessage.name = get(payload, 'name', "No name")
+        newMessage.uuid = get(payload, 'uuid', "No UUID")
+        newMessage.tint = get(payload, 'tint', "No tint")
+        this.state.messages.push(newMessage);
+      } catch (err) {
+        Sentry.captureException(err);
+      }
     });
 
     this.onMessage("remove", (client, payload) => {
-      console.log('REMOVE')
-      console.dir(payload)
-      let targetMessageIndex = this.state.messages.findIndex((m: Message) => m.msgId == payload.msgId)
-      console.log(targetMessageIndex)
-      this.state.messages.splice(targetMessageIndex, 1);
+      try {
+        let targetMessageIndex = this.state.messages.findIndex((m: Message) => m.msgId == payload.msgId)
+        this.state.messages.splice(targetMessageIndex, 1);
+      } catch (err) {
+        Sentry.captureException(err);
+      }
     });
 
   }
 
-
-
-  //   onJoin(client: Client, options: any) {
-  //     console.log('CHAT')
-  //  }
-
-  // onLeave(client: Client, consented: boolean) {
-  //   // delete this.state.players[client.sessionId];
-  // }
-
-  // onDispose() {
-  // }
-
 }
+

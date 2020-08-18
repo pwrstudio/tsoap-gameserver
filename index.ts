@@ -4,9 +4,8 @@ import cors from "cors";
 import { Server } from "colyseus";
 import { monitor } from "@colyseus/monitor";
 import * as Sentry from '@sentry/node';
-// import socialRoutes from "@colyseus/social/express"
 
-Sentry.init({ dsn: 'https://53649fd6370545159443264caa8cc0ff@o65254.ingest.sentry.io/5377429' });
+Sentry.init({ dsn: 'https://7cb5d18a944d4a0cb8a9c4ddd6fa1d9d@o433904.ingest.sentry.io/5390092' });
 
 import { GameRoom } from "./GameRoom";
 import { ChatRoom } from "./ChatRoom";
@@ -26,16 +25,9 @@ const gameServer = new Server({
 gameServer.define('game', GameRoom);
 gameServer.define('chat', ChatRoom);
 
-/**
- * Register @colyseus/social routes
- *
- * - uncomment if you want to use default authentication (https://docs.colyseus.io/authentication/)
- * - also uncomment the import statement
- */
-// app.use("/", socialRoutes);
-
 // register colyseus monitor AFTER registering your room handlers
 app.use("/colyseus", monitor());
 
 gameServer.listen(port);
 console.log(`Listening on ws://localhost:${port}`)
+

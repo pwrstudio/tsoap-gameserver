@@ -24,11 +24,11 @@ class State extends Schema {
 
 export class ChatRoom extends Room {
 
-  autoDispose = false;
-
   onCreate(options: any) {
 
     this.setState(new State());
+
+    console.dir(options)
 
     this.onMessage("submit", (client, payload) => {
       try {

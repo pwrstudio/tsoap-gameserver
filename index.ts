@@ -23,6 +23,7 @@ const gameServer = new Server({
 
 // register your room handlers
 gameServer.define('game', GameRoom);
+// gameServer.define('chat', ChatRoom);
 gameServer.define('chat', ChatRoom);
 
 // register colyseus monitor AFTER registering your room handlers
@@ -30,4 +31,3 @@ app.use("/colyseus", monitor());
 
 gameServer.listen(port);
 console.log(`Listening on ws://localhost:${port}`)
-

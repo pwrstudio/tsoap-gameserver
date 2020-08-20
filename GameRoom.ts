@@ -8,13 +8,10 @@ import get from 'lodash/get'
 import * as Sentry from '@sentry/node';
 
 const SSO_SECRET = "daymoon";
+const MAX_STACK_HEIGHT = 200;
 
-// try { 
 const rawdata = fs.readFileSync('hkw-map-color-hard.json');
 const mapMatrix = JSON.parse(rawdata.toString()).data;
-// } catch (err) {
-//   Sentry.captureException(err);
-// }
 
 // 0 = white
 // 1 = black
@@ -29,6 +26,7 @@ easystar.setAcceptableTiles([0, 2, 3, 4, 5]);
 // easystar.setIterationsPerCalculation(1000);
 easystar.enableDiagonals();
 // easystar.disableCornerCutting()
+
 
 class IP extends Schema {
     @type("string") address: string;
@@ -58,12 +56,29 @@ class Player extends Schema {
     @type(Path) path: Path = new Path();
 }
 
+class Message extends Schema {
+    @type("string") msgId: string;
+    @type("string") uuid: string;
+    @type("string") name: string;
+    @type("string") text: string;
+    @type("string") tint: string;
+    @type("number") timestamp: number;
+}
+
+class PrivateRoom extends Schema {
+    @type(["string"]) clients = new ArraySchema<"string">();
+}
+
 class State extends Schema {
     @type([IP]) blacklist = new ArraySchema<IP>();
     @type({ map: Player }) players = new MapSchema();
+    @type([Message]) messages = new ArraySchema<Message>();
+    @type({ map: PrivateRoom }) privateRooms = new MapSchema();
 }
 
 export class GameRoom extends Room {
+
+    autoDispose = false;
 
     onCreate(options: any) {
 
@@ -188,6 +203,52 @@ export class GameRoom extends Room {
             this.state.players[client.sessionId].y = newY
 
         })
+
+        this.onMessage("submitChatMessage", (client, payload) => {
+            try {
+                if (this.state.messages.length > MAX_STACK_HEIGHT) {
+                    this.state.messages.splice(0, 1);
+                }
+                let newMessage = new Message()
+                newMessage.msgId = get(payload, 'msgId', "No msgId")
+                newMessage.text = get(payload, 'text', "No text")
+                newMessage.name = get(payload, 'name', "No name")
+                newMessage.uuid = get(payload, 'uuid', "No UUID")
+                newMessage.tint = get(payload, 'tint', "No tint")
+                newMessage.timestamp = Date.now();
+                this.state.messages.push(newMessage);
+            } catch (err) {
+                Sentry.captureException(err);
+            }
+        });
+
+        this.onMessage("removeChatMessage", (client, payload) => {
+            try {
+                let targetMessageIndex = this.state.messages.findIndex((m: Message) => m.msgId == payload.msgId)
+                this.state.messages.splice(targetMessageIndex, 1);
+            } catch (err) {
+                Sentry.captureException(err);
+            }
+        });
+
+        // createPrivateRoom
+        this.onMessage("createPrivateRoom", (client, payload) => {
+            console.log(payload.roomId)
+            this.state.privateRooms[payload.roomId] = new PrivateRoom();
+            this.state.privateRooms[payload.roomId].clients.push(client.sessionId)
+            this.state.privateRooms[payload.roomId].clients.push(payload.partner)
+            console.dir(this.state.privateRooms)
+        })
+
+        // leavePrivateRoom
+        this.onMessage("leavePrivateRoom", (client, payload) => {
+            console.log(payload.roomId)
+            delete this.state.privateRooms[payload.roomId]
+            console.dir(this.state.privateRooms)
+        })
+
+        // joinPrivateRoom
+
 
     }
 

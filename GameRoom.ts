@@ -335,9 +335,10 @@ export class GameRoom extends Room {
 
     async onLeave(client: Client, consented: boolean) {
         console.log('LEFT')
+        delete this.state.players[client.sessionId];
+
         // try {
         //     console.log('Left:', this.state.players[client.sessionId].name)
-        //     delete this.state.players[client.sessionId];
         // } catch (err) {
         //     Sentry.captureException(err);
         // }

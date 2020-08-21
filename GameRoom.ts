@@ -80,6 +80,8 @@ export class GameRoom extends Room {
 
     autoDispose = false;
 
+    maxClients = 500;
+
     onCreate(options: any) {
 
         this.setState(new State());

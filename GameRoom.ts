@@ -216,17 +216,19 @@ export class GameRoom extends Room {
 
         this.onMessage("submitChatMessage", (client, payload) => {
             try {
-                if (this.state.messages.length > MAX_STACK_HEIGHT) {
-                    this.state.messages.splice(0, 1);
+                if (payload.text && payload.text.length > 0) {
+                    if (this.state.messages.length > MAX_STACK_HEIGHT) {
+                        this.state.messages.splice(0, 1);
+                    }
+                    let newMessage = new Message()
+                    newMessage.msgId = get(payload, 'msgId', "No msgId")
+                    newMessage.text = payload.text.substring(0, MAX_CHATMESSAGE_LENGTH);
+                    newMessage.name = get(payload, 'name', "No name")
+                    newMessage.uuid = get(payload, 'uuid', "No UUID")
+                    newMessage.tint = get(payload, 'tint', "No tint")
+                    newMessage.timestamp = Date.now();
+                    this.state.messages.push(newMessage);
                 }
-                let newMessage = new Message()
-                newMessage.msgId = get(payload, 'msgId', "No msgId")
-                newMessage.text = get(payload, 'text', "No text").substring(0, MAX_CHATMESSAGE_LENGTH);
-                newMessage.name = get(payload, 'name', "No name")
-                newMessage.uuid = get(payload, 'uuid', "No UUID")
-                newMessage.tint = get(payload, 'tint', "No tint")
-                newMessage.timestamp = Date.now();
-                this.state.messages.push(newMessage);
             } catch (err) {
                 Sentry.captureException(err);
             }

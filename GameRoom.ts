@@ -5,10 +5,14 @@ import crypto from 'crypto'
 import querystring from 'querystring'
 import fs from 'fs';
 import get from 'lodash/get'
+import isNumber from 'lodash/isNumber'
 import * as Sentry from '@sentry/node';
 
 const SSO_SECRET = "daymoon";
 const MAX_STACK_HEIGHT = 200;
+const MAX_USERNAME_LENGTH = 100;
+const MAX_CHATMESSAGE_LENGTH = 1000;
+
 
 const rawdata = fs.readFileSync('hkw-map-color-hard.json');
 const mapMatrix = JSON.parse(rawdata.toString()).data;
@@ -173,36 +177,40 @@ export class GameRoom extends Room {
         this.onMessage("teleport", (client, message) => {
             console.dir(message)
 
-            let newX = 0
-            let newY = 0
+            if (message.area) {
 
-            let colorIndex = 0
-            if (message.area == 'green')
-                colorIndex = 4
-            else if (message.area == 'blue')
-                colorIndex = 5
-            else if (message.area == 'yellow')
-                colorIndex = 2
-            else if (message.area == 'red')
-                colorIndex = 3
+                let newX = 0
+                let newY = 0
 
-            console.log(colorIndex)
+                let colorIndex = 0
+                if (message.area == 'green')
+                    colorIndex = 4
+                else if (message.area == 'blue')
+                    colorIndex = 5
+                else if (message.area == 'yellow')
+                    colorIndex = 2
+                else if (message.area == 'red')
+                    colorIndex = 3
 
-            while (true) {
-                newX = Math.ceil((Math.floor(Math.random() * (4950 - 50 + 1)) + 50) / 10) * 10;
-                newY = Math.ceil((Math.floor(Math.random() * (4950 - 50 + 1)) + 50) / 10) * 10;
-                if (mapMatrix[newY / 10][newX / 10] == colorIndex) break;
+                console.log(colorIndex)
+
+                while (true) {
+                    newX = Math.ceil((Math.floor(Math.random() * (4950 - 50 + 1)) + 50) / 10) * 10;
+                    newY = Math.ceil((Math.floor(Math.random() * (4950 - 50 + 1)) + 50) / 10) * 10;
+                    if (mapMatrix[newY / 10][newX / 10] == colorIndex) break;
+                }
+
+                console.log('TELEPORT')
+                console.log('area', mapMatrix[newY / 10][newX / 10])
+                console.log('=> Y', newY)
+                console.log('=> X', newX)
+                console.log('- - - - - ')
+
+                this.state.players[client.sessionId].area = colorIndex
+                this.state.players[client.sessionId].x = newX
+                this.state.players[client.sessionId].y = newY
+
             }
-
-            console.log('TELEPORT')
-            console.log('area', mapMatrix[newY / 10][newX / 10])
-            console.log('=> Y', newY)
-            console.log('=> X', newX)
-            console.log('- - - - - ')
-
-            this.state.players[client.sessionId].area = colorIndex
-            this.state.players[client.sessionId].x = newX
-            this.state.players[client.sessionId].y = newY
 
         })
 
@@ -213,7 +221,7 @@ export class GameRoom extends Room {
                 }
                 let newMessage = new Message()
                 newMessage.msgId = get(payload, 'msgId', "No msgId")
-                newMessage.text = get(payload, 'text', "No text")
+                newMessage.text = get(payload, 'text', "No text").substring(0, MAX_CHATMESSAGE_LENGTH);
                 newMessage.name = get(payload, 'name', "No name")
                 newMessage.uuid = get(payload, 'uuid', "No UUID")
                 newMessage.tint = get(payload, 'tint', "No tint")
@@ -227,7 +235,9 @@ export class GameRoom extends Room {
         this.onMessage("removeChatMessage", (client, payload) => {
             try {
                 let targetMessageIndex = this.state.messages.findIndex((m: Message) => m.msgId == payload.msgId)
-                this.state.messages.splice(targetMessageIndex, 1);
+                if (isNumber(targetMessageIndex)) {
+                    this.state.messages.splice(targetMessageIndex, 1);
+                }
             } catch (err) {
                 Sentry.captureException(err);
             }
@@ -258,18 +268,14 @@ export class GameRoom extends Room {
         if (!this.state.blacklist.find((ip: IP) => ip.address == request.connection.remoteAddress)) {
             console.dir(options)
 
-            options.ip = request.connection.remoteAddress
+            options.ip = get(request, 'connection.remoteAddress', '6.6.6.6')
 
             if (options.sso && options.sig) {
-
-                console.log('further authenticaion...')
-
-                // Compute the HMAC-SHA256 of sso using sso provider secret as your key.
+                console.log('Authenticate accredited user')
                 const hmac = crypto.createHmac('sha256', SSO_SECRET);
                 const decoded_sso = decodeURIComponent(options.sso);
                 hmac.update(decoded_sso);
                 const hash = hmac.digest('hex');
-                console.log('hash', hash)
                 if (options.sig == hash) {
                     const b = Buffer.from(options.sso, 'base64');
                     const inner_qstring = b.toString('utf8');
@@ -311,11 +317,11 @@ export class GameRoom extends Room {
 
                 this.state.players[client.sessionId] = new Player();
                 this.state.players[client.sessionId].authenticated = options.authenticated || false;
-                this.state.players[client.sessionId].tint = options.tint;
-                this.state.players[client.sessionId].name = options.name;
-                this.state.players[client.sessionId].uuid = options.uuid;
-                this.state.players[client.sessionId].ip = options.ip;
-                this.state.players[client.sessionId].avatar = options.avatar;
+                this.state.players[client.sessionId].tint = get(options, 'tint', '0XFF0000');
+                this.state.players[client.sessionId].name = get(options, 'name', 'Undefined name').substring(0, MAX_USERNAME_LENGTH);
+                this.state.players[client.sessionId].uuid = get(options, 'uuid', 'no-uuid');
+                this.state.players[client.sessionId].ip = get(options, 'ip', '6.6.6.6');
+                this.state.players[client.sessionId].avatar = get(options, 'avatar', 1);
                 this.state.players[client.sessionId].connected = true;
                 this.state.players[client.sessionId].x = startX
                 this.state.players[client.sessionId].y = startY
@@ -328,12 +334,13 @@ export class GameRoom extends Room {
     }
 
     async onLeave(client: Client, consented: boolean) {
-        try {
-            console.log('Left:', this.state.players[client.sessionId].name)
-            delete this.state.players[client.sessionId];
-        } catch (err) {
-            Sentry.captureException(err);
-        }
+        console.log('LEFT')
+        // try {
+        //     console.log('Left:', this.state.players[client.sessionId].name)
+        //     delete this.state.players[client.sessionId];
+        // } catch (err) {
+        //     Sentry.captureException(err);
+        // }
     }
 
     onDispose() {

@@ -6,7 +6,7 @@ import querystring from 'querystring'
 import fs from 'fs';
 import get from 'lodash/get'
 import isNumber from 'lodash/isNumber'
-import * as Sentry from '@sentry/node';
+// import * as Sentry from '@sentry/node';
 import PF from 'pathfinding';
 import { find } from "lodash";
 
@@ -21,6 +21,9 @@ const mapMatrix = JSON.parse(rawdata.toString()).data;
 const rawdataBit = fs.readFileSync('hkw-map-bit.json');
 const bitMatrix = JSON.parse(rawdataBit.toString()).data;
 
+
+// console.dir(rawdataBit)
+// console.log(bitMatrix)
 // 0 = white
 // 1 = black
 // 2 = yellow
@@ -44,9 +47,9 @@ var finder = new PF.AStarFinder({
 
 // var finder = new PF.BestFirstFinder();
 
+// console.dir(grid)
+
 console.dir(finder)
-
-
 
 class IP extends Schema {
     @type("string") address: string;
@@ -125,7 +128,8 @@ export class GameRoom extends Room {
                     }
                 }
             } catch (err) {
-                Sentry.captureException(err);
+                console.log(err)
+                // Sentry.captureException(err);
             }
         });
 
@@ -136,7 +140,9 @@ export class GameRoom extends Room {
                 const itemIndex = this.state.blacklist.findIndex((ip: IP) => ip === newIP);
                 this.state.blacklist.splice(itemIndex, 1);
             } catch (err) {
-                Sentry.captureException(err);
+                console.log(err)
+
+                // Sentry.captureException(err);
             }
         });
 
@@ -158,10 +164,20 @@ export class GameRoom extends Room {
                 let loResRoundedY = roundedY / 10
                 let loResRoundedX = roundedX / 10
 
+                // let tinyRoundedY = Math.ceil(roundedY / 40)
+                // let tinyRoundedX = Math.ceil(roundedX / 40)
+
+                // console.log(tinyRoundedY)
+                // console.log(tinyRoundedX)
+
+
+
                 // console.log('iswalkable', grid.isWalkableAt(loResRoundedX, loResRoundedY))
 
                 // console.dir(grid.getNodeAt(loResRoundedX, loResRoundedY))
                 // console.dir(mapMatrix[loResRoundedX][loResRoundedY])
+
+                // console.log(grid.isWalkableAt(tinyRoundedX, tinyRoundedY))
 
                 if (grid.isWalkableAt(loResRoundedX, loResRoundedY)) {
 
@@ -177,45 +193,139 @@ export class GameRoom extends Room {
                         loResRoundedY,
                         grid.clone());
 
-                    // console.dir(path)
-                    // var maxVal = 4;
-                    let simpPath = []
+                    console.dir(path)
+                    // // var maxVal = 4;
+                    // let culledPath: number[][] = [];
 
-                    // var delta = Math.floor(path.length / maxVal);
+                    // // var delta = Math.floor(path.length / maxVal);
 
-                    // console.log(delta)
+                    // // console.log(delta)
 
-                    for (let i = 0; i < path.length; i = i + 4) {
-                        simpPath.push(path[i]);
-                    }
+                    // for (let i = 0; i < path.length; i = i + 4) {
+                    //     culledPath.push(path[i]);
+                    // }
 
-                    let interpolPath = []
+                    // let interpolatedPath: number[][] = [];
 
-                    for (let y = 0; y < simpPath.length; y++) {
-                        console.log(y * 4, simpPath[y])
-                        interpolPath.push(simpPath[y])
-                        if (y !== simpPath.length - 1) {
-                            let directionX = simpPath[y + 1][0] > simpPath[y][0] ? 'right' : 'left'
-                            let directionY = simpPath[y + 1][1] > simpPath[y][1] ? 'down' : 'up'
-                            console.log(directionX, directionY)
-                            for (let x = 1; x < 5; x++) {
-                                let nextStep;
-                                if (directionX == 'right') nextStep = [simpPath[y][0] + x, simpPath[y + 1][1]]
-                                if (directionY == 'down') nextStep = [simpPath[y + 1][0], simpPath[y][1] - x]
-                                console.log(y * 4 + x, nextStep)
-                                interpolPath.push(nextStep)
-                            }
-                        }
-                    }
+                    // console.log(culledPath.length)
 
-                    console.log('path', path.length)
-                    console.log('simp', simpPath.length)
-                    console.log('interpolPAth:', interpolPath.length)
+                    // // for (let i = 0; i < culledPath.length; i++) {
+                    // culledPath.forEach((node, i) => {
+
+                    //     if (i !== culledPath.length - 1) {
+                    //         let currentPoint = culledPath[i];
+                    //         let nextPoint = culledPath[i + 1];
+
+
+
+                    //         console.log('***** ROUND', i)
+                    //         console.log('– Current Point', currentPoint)
+                    //         console.log('– Next Point', nextPoint)
+                    //         // X
+                    //         console.log(':::: X')
+                    //         let accumulatorX = 0
+                    //         let differenceX = nextPoint[0] - currentPoint[0]
+                    //         let directionX = differenceX >= 0 ? 1 : -1;
+                    //         console.log('– Difference X', differenceX)
+                    //         console.log('– Direction X', directionX)
+
+                    //         for (let step = 1; step < 5; step++) {
+                    //             let increment = differenceX !== 0 ? directionX * 1 : 0;
+                    //             accumulatorX += increment
+                    //             console.log('differenceX', differenceX)
+                    //             console.log('increment', increment)
+                    //             console.log('accumulatorX', accumulatorX)
+                    //             let newPoint = [currentPoint[0] + accumulatorX, currentPoint[1]]
+                    //             console.log(newPoint)
+                    //             interpolatedPath.push([currentPoint[0] + accumulatorX, currentPoint[1]])
+                    //             differenceX = differenceX == 0 ? 0 : differenceX - directionX
+                    //             // console.log(step, ' – ', differenceX == 0 ? '_____' : differenceX)
+                    //         }
+                    //         // Y
+                    //         console.log(':::: Y')
+                    //         let accumulatorY = 0
+                    //         let differenceY = nextPoint[1] - currentPoint[1]
+                    //         let directionY = differenceY >= 0 ? 1 : -1;
+                    //         console.log('– Difference Y', differenceY)
+                    //         console.log('– Direction Y', directionY)
+                    //         for (let step = 1; step < 5; step++) {
+                    //             let increment = differenceY > 0 ? directionY * 1 : 0;
+                    //             accumulatorY += increment
+                    //             let newPoint = [nextPoint[0], currentPoint[1] + accumulatorY]
+                    //             differenceY = differenceY == 0 ? 0 : differenceY - directionY
+                    //             console.log(newPoint)
+                    //             interpolatedPath.push(newPoint)
+                    //             // console.log(step, ' – ', differenceY == 0 ? '_____' : differenceY)
+                    //         }
+                    //         console.log(' ')
+                    //     } else {
+                    //         console.log('@@@@ Last Iteration')
+                    //         console.log(' ')
+                    //     }
+                    // })
+
+                    // console.log('done')
+
+                    // console.dir(interpolatedPath)
+
+                    // let interpolPath = []
+
+                    // for (let y = 0; y < simpPath.length; y++) {
+
+                    //     for (let x = 1; x < 5; x++) {
+                    //         if (directionX == 'right') {
+                    //             let nextStep = [simpPath[y][0] + x, simpPath[y][1]]
+                    //             interpolPath.push(nextStep)
+                    //         } else {
+                    //             let nextStep = [simpPath[y][0] - x, simpPath[y][1]]
+                    //             interpolPath.push(nextStep)
+                    //         }
+                    //     }
+
+
+                    //     console.log(y, simpPath[y])
+                    //     interpolPath.push(simpPath[y])
+                    //     let isEven = y % 2
+
+                    //     if (isEven) {
+                    //         let directionX = simpPath[y + 1][0] > simpPath[y][0] ? 'right' : 'left'
+
+                    //     } else {
+                    //         let directionY = simpPath[y + 1][1] > simpPath[y][1] ? 'down' : 'up'
+                    //         for (let x = 1; x < 5; x++) {
+                    //             if (directionY == 'right') {
+                    //                 let nextStep = [simpPath[y][0], simpPath[y][1] + x]
+                    //                 interpolPath.push(nextStep)
+                    //             } else {
+                    //                 let nextStep = [simpPath[y][0], simpPath[y][1] + x]
+                    //                 interpolPath.push(nextStep)
+                    //             }
+                    //         }
+
+                    //     }
+
+
+                    //     // if (y !== simpPath.length - 1) {
+                    //     //     let directionX = simpPath[y + 1][0] > simpPath[y][0] ? 'right' : 'left'
+                    //     //     let directionY = simpPath[y + 1][1] > simpPath[y][1] ? 'down' : 'up'
+                    //     //     console.log(directionX, directionY)
+                    //     //         let nextStep;
+                    //     //         if (directionX == 'right') nextStep = [simpPath[y][0] + x, simpPath[y + 1][1]]
+                    //     //         if (directionY == 'down') nextStep = [simpPath[y + 1][0], simpPath[y][1] - x]
+                    //     //         console.log(y * 4 + x, nextStep)
+                    //     //         interpolPath.push(nextStep)
+                    //     //     }
+                    //     // }
+                    // }
+
+                    // console.log('path', path.length)
+                    // console.log('simp', simpPath.length)
+                    // console.log('interpolPAth:', interpolPath.length)
 
                     // PF.Util.expandPath(
                     // path = PF.Util.expandPath(PF.Util.smoothenPath(grid.clone(), path));
 
-                    path = interpolPath
+                    // path = interpolatedPath
 
                     if (path.length > 0) {
                         this.state.players[client.sessionId].x = roundedX;
@@ -262,7 +372,9 @@ export class GameRoom extends Room {
                     client.send('illegalMove', {})
                 }
             } catch (err) {
-                Sentry.captureException(err);
+                console.log(err)
+
+                // Sentry.captureException(err);
             }
 
         });
@@ -323,7 +435,9 @@ export class GameRoom extends Room {
                     this.state.messages.push(newMessage);
                 }
             } catch (err) {
-                Sentry.captureException(err);
+                console.log(err)
+
+                // Sentry.captureException(err);
             }
         });
 
@@ -334,7 +448,8 @@ export class GameRoom extends Room {
                     this.state.messages.splice(targetMessageIndex, 1);
                 }
             } catch (err) {
-                Sentry.captureException(err);
+                console.log(err)
+                // Sentry.captureException(err);
             }
         });
 
@@ -423,7 +538,9 @@ export class GameRoom extends Room {
                 this.state.players[client.sessionId].area = mapMatrix[startY / 10][startX / 10]
 
             } catch (err) {
-                Sentry.captureException(err);
+                console.log(err)
+
+                // Sentry.captureException(err);
             }
         }
     }

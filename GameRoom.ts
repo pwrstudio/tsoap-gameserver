@@ -1,21 +1,25 @@
 import { Room, Client } from "colyseus";
 import { Schema, MapSchema, ArraySchema, type } from "@colyseus/schema";
-import EasyStar from 'easystarjs'
+// import EasyStar from 'easystarjs'
 import crypto from 'crypto'
 import querystring from 'querystring'
 import fs from 'fs';
 import get from 'lodash/get'
 import isNumber from 'lodash/isNumber'
 import * as Sentry from '@sentry/node';
+import PF from 'pathfinding';
+import { find } from "lodash";
 
 const SSO_SECRET = "daymoon";
 const MAX_STACK_HEIGHT = 200;
 const MAX_USERNAME_LENGTH = 100;
 const MAX_CHATMESSAGE_LENGTH = 1000;
 
-
 const rawdata = fs.readFileSync('hkw-map-color-hard.json');
 const mapMatrix = JSON.parse(rawdata.toString()).data;
+
+const rawdataBit = fs.readFileSync('hkw-map-bit.json');
+const bitMatrix = JSON.parse(rawdataBit.toString()).data;
 
 // 0 = white
 // 1 = black
@@ -24,12 +28,24 @@ const mapMatrix = JSON.parse(rawdata.toString()).data;
 // 4 = green
 // 5 = blue
 
-const easystar = new EasyStar.js();
-easystar.setGrid(mapMatrix)
-easystar.setAcceptableTiles([0, 2, 3, 4, 5]);
+// const easystar = new EasyStar.js();
+// easystar.setGrid(mapMatrix)
+// easystar.setAcceptableTiles([0, 2, 3, 4, 5]);
 // easystar.setIterationsPerCalculation(1000);
-easystar.enableDiagonals();
+// easystar.enableDiagonals();
 // easystar.disableCornerCutting()
+
+var grid = new PF.Grid(bitMatrix);
+
+var finder = new PF.AStarFinder({
+    heuristic: PF.Heuristic.manhattan,
+    weight: 1000,
+});
+
+// var finder = new PF.BestFirstFinder();
+
+console.dir(finder)
+
 
 
 class IP extends Schema {
@@ -139,30 +155,107 @@ export class GameRoom extends Room {
                 console.log('X', roundedX)
                 console.log('- - - - - ')
 
-                if (mapMatrix[roundedY / 10][roundedX / 10] !== 1) {
+                let loResRoundedY = roundedY / 10
+                let loResRoundedX = roundedX / 10
 
-                    easystar.findPath(this.state.players[client.sessionId].x / 10,
+                // console.log('iswalkable', grid.isWalkableAt(loResRoundedX, loResRoundedY))
+
+                // console.dir(grid.getNodeAt(loResRoundedX, loResRoundedY))
+                // console.dir(mapMatrix[loResRoundedX][loResRoundedY])
+
+                if (grid.isWalkableAt(loResRoundedX, loResRoundedY)) {
+
+                    // console.log('start X:', this.state.players[client.sessionId].x / 10)
+                    // console.log('start Y:', this.state.players[client.sessionId].y / 10)
+                    // console.log('end X:', loResRoundedX)
+                    // console.log('end Y:', loResRoundedY)
+
+                    let path = finder.findPath(
+                        this.state.players[client.sessionId].x / 10,
                         this.state.players[client.sessionId].y / 10,
-                        roundedX / 10,
-                        roundedY / 10, path => {
-                            if (path === null) {
-                                console.error('no path')
-                            } else {
-                                this.state.players[client.sessionId].x = roundedX;
-                                this.state.players[client.sessionId].y = roundedY;
-                                this.state.players[client.sessionId].path = new Path();
-                                path.forEach(wp => {
-                                    let tempWp = new Waypoint()
-                                    tempWp.y = wp.y * 10
-                                    tempWp.x = wp.x * 10
-                                    this.state.players[client.sessionId].path.waypoints.push(tempWp)
-                                })
-                                let lastWaypoint = path.slice(-1)[0]
-                                this.state.players[client.sessionId].area = mapMatrix[get(lastWaypoint, 'y', 0)][get(lastWaypoint, 'x', 0)]
-                            }
-                        });
+                        loResRoundedX,
+                        loResRoundedY,
+                        grid.clone());
 
-                    easystar.calculate();
+                    // console.dir(path)
+                    // var maxVal = 4;
+                    let simpPath = []
+
+                    // var delta = Math.floor(path.length / maxVal);
+
+                    // console.log(delta)
+
+                    for (let i = 0; i < path.length; i = i + 4) {
+                        simpPath.push(path[i]);
+                    }
+
+                    let interpolPath = []
+
+                    for (let y = 0; y < simpPath.length; y++) {
+                        console.log(y * 4, simpPath[y])
+                        interpolPath.push(simpPath[y])
+                        if (y !== simpPath.length - 1) {
+                            let directionX = simpPath[y + 1][0] > simpPath[y][0] ? 'right' : 'left'
+                            let directionY = simpPath[y + 1][1] > simpPath[y][1] ? 'down' : 'up'
+                            console.log(directionX, directionY)
+                            for (let x = 1; x < 5; x++) {
+                                let nextStep;
+                                if (directionX == 'right') nextStep = [simpPath[y][0] + x, simpPath[y + 1][1]]
+                                if (directionY == 'down') nextStep = [simpPath[y + 1][0], simpPath[y][1] - x]
+                                console.log(y * 4 + x, nextStep)
+                                interpolPath.push(nextStep)
+                            }
+                        }
+                    }
+
+                    console.log('path', path.length)
+                    console.log('simp', simpPath.length)
+                    console.log('interpolPAth:', interpolPath.length)
+
+                    // PF.Util.expandPath(
+                    // path = PF.Util.expandPath(PF.Util.smoothenPath(grid.clone(), path));
+
+                    path = interpolPath
+
+                    if (path.length > 0) {
+                        this.state.players[client.sessionId].x = roundedX;
+                        this.state.players[client.sessionId].y = roundedY;
+                        this.state.players[client.sessionId].path = new Path();
+                        path.forEach(wp => {
+                            let tempWp = new Waypoint()
+                            tempWp.x = wp[0] * 10
+                            tempWp.y = wp[1] * 10
+                            this.state.players[client.sessionId].path.waypoints.push(tempWp)
+                        })
+                        let lastWaypoint = path.slice(-1)[0]
+                        this.state.players[client.sessionId].area = mapMatrix[lastWaypoint[1]][lastWaypoint[0]]
+                    } else {
+                        client.send('illegalMove', {})
+                    }
+
+
+                    // easystar.findPath(this.state.players[client.sessionId].x / 10,
+                    //     this.state.players[client.sessionId].y / 10,
+                    //     roundedX / 10,
+                    //     roundedY / 10, path => {
+                    //         if (path === null) {
+                    //             console.error('no path')
+                    //         } else {
+                    //             this.state.players[client.sessionId].x = roundedX;
+                    //             this.state.players[client.sessionId].y = roundedY;
+                    //             this.state.players[client.sessionId].path = new Path();
+                    //             path.forEach(wp => {
+                    //                 let tempWp = new Waypoint()
+                    //                 tempWp.y = wp.y * 10
+                    //                 tempWp.x = wp.x * 10
+                    //                 this.state.players[client.sessionId].path.waypoints.push(tempWp)
+                    //             })
+                    //             let lastWaypoint = path.slice(-1)[0]
+                    //             this.state.players[client.sessionId].area = mapMatrix[get(lastWaypoint, 'y', 0)][get(lastWaypoint, 'x', 0)]
+                    //         }
+                    //     });
+
+                    // easystar.calculate();
 
                 } else {
                     // TODO: find closes allowed position

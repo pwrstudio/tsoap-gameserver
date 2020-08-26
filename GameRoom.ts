@@ -189,33 +189,33 @@ export class GameRoom extends Room {
                         simpPath.push(path[i]);
                     }
 
-                    let interpolPath = []
+                    // let interpolPath = []
 
-                    for (let y = 0; y < simpPath.length; y++) {
-                        console.log(y * 4, simpPath[y])
-                        interpolPath.push(simpPath[y])
-                        if (y !== simpPath.length - 1) {
-                            let directionX = simpPath[y + 1][0] > simpPath[y][0] ? 'right' : 'left'
-                            let directionY = simpPath[y + 1][1] > simpPath[y][1] ? 'down' : 'up'
-                            console.log(directionX, directionY)
-                            for (let x = 1; x < 5; x++) {
-                                let nextStep;
-                                if (directionX == 'right') nextStep = [simpPath[y][0] + x, simpPath[y + 1][1]]
-                                if (directionY == 'down') nextStep = [simpPath[y + 1][0], simpPath[y][1] - x]
-                                console.log(y * 4 + x, nextStep)
-                                interpolPath.push(nextStep)
-                            }
-                        }
-                    }
+                    // for (let y = 0; y < simpPath.length; y++) {
+                    //     console.log(y * 4, simpPath[y])
+                    //     interpolPath.push(simpPath[y])
+                    //     if (y !== simpPath.length - 1) {
+                    //         let directionX = simpPath[y + 1][0] > simpPath[y][0] ? 'right' : 'left'
+                    //         let directionY = simpPath[y + 1][1] > simpPath[y][1] ? 'down' : 'up'
+                    //         console.log(directionX, directionY)
+                    //         for (let x = 1; x < 5; x++) {
+                    //             let nextStep;
+                    //             if (directionX == 'right') nextStep = [simpPath[y][0] + x, simpPath[y + 1][1]]
+                    //             if (directionY == 'down') nextStep = [simpPath[y + 1][0], simpPath[y][1] - x]
+                    //             console.log(y * 4 + x, nextStep)
+                    //             interpolPath.push(nextStep)
+                    //         }
+                    //     }
+                    // }
 
                     console.log('path', path.length)
                     console.log('simp', simpPath.length)
-                    console.log('interpolPAth:', interpolPath.length)
+                    // console.log('interpolPAth:', interpolPath.length)
 
                     // PF.Util.expandPath(
                     // path = PF.Util.expandPath(PF.Util.smoothenPath(grid.clone(), path));
 
-                    path = interpolPath
+                    path = simpPath
 
                     if (path.length > 0) {
                         this.state.players[client.sessionId].x = roundedX;

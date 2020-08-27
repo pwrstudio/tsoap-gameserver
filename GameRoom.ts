@@ -217,115 +217,33 @@ export class GameRoom extends Room {
                     //         let nextPoint = culledPath[i + 1];
 
 
-
-                    //         console.log('***** ROUND', i)
-                    //         console.log('– Current Point', currentPoint)
-                    //         console.log('– Next Point', nextPoint)
-                    //         // X
-                    //         console.log(':::: X')
-                    //         let accumulatorX = 0
-                    //         let differenceX = nextPoint[0] - currentPoint[0]
-                    //         let directionX = differenceX >= 0 ? 1 : -1;
-                    //         console.log('– Difference X', differenceX)
-                    //         console.log('– Direction X', directionX)
-
-                    //         for (let step = 1; step < 5; step++) {
-                    //             let increment = differenceX !== 0 ? directionX * 1 : 0;
-                    //             accumulatorX += increment
-                    //             console.log('differenceX', differenceX)
-                    //             console.log('increment', increment)
-                    //             console.log('accumulatorX', accumulatorX)
-                    //             let newPoint = [currentPoint[0] + accumulatorX, currentPoint[1]]
-                    //             console.log(newPoint)
-                    //             interpolatedPath.push([currentPoint[0] + accumulatorX, currentPoint[1]])
-                    //             differenceX = differenceX == 0 ? 0 : differenceX - directionX
-                    //             // console.log(step, ' – ', differenceX == 0 ? '_____' : differenceX)
-                    //         }
-                    //         // Y
-                    //         console.log(':::: Y')
-                    //         let accumulatorY = 0
-                    //         let differenceY = nextPoint[1] - currentPoint[1]
-                    //         let directionY = differenceY >= 0 ? 1 : -1;
-                    //         console.log('– Difference Y', differenceY)
-                    //         console.log('– Direction Y', directionY)
-                    //         for (let step = 1; step < 5; step++) {
-                    //             let increment = differenceY > 0 ? directionY * 1 : 0;
-                    //             accumulatorY += increment
-                    //             let newPoint = [nextPoint[0], currentPoint[1] + accumulatorY]
-                    //             differenceY = differenceY == 0 ? 0 : differenceY - directionY
-                    //             console.log(newPoint)
-                    //             interpolatedPath.push(newPoint)
-                    //             // console.log(step, ' – ', differenceY == 0 ? '_____' : differenceY)
-                    //         }
-                    //         console.log(' ')
-                    //     } else {
-                    //         console.log('@@@@ Last Iteration')
-                    //         console.log(' ')
-                    //     }
-                    // })
-
-                    // console.log('done')
-
-                    // console.dir(interpolatedPath)
-
                     // let interpolPath = []
 
                     // for (let y = 0; y < simpPath.length; y++) {
-
-                    //     for (let x = 1; x < 5; x++) {
-                    //         if (directionX == 'right') {
-                    //             let nextStep = [simpPath[y][0] + x, simpPath[y][1]]
-                    //             interpolPath.push(nextStep)
-                    //         } else {
-                    //             let nextStep = [simpPath[y][0] - x, simpPath[y][1]]
-                    //             interpolPath.push(nextStep)
-                    //         }
-                    //     }
-
-
-                    //     console.log(y, simpPath[y])
+                    //     console.log(y * 4, simpPath[y])
                     //     interpolPath.push(simpPath[y])
-                    //     let isEven = y % 2
-
-                    //     if (isEven) {
+                    //     if (y !== simpPath.length - 1) {
                     //         let directionX = simpPath[y + 1][0] > simpPath[y][0] ? 'right' : 'left'
-
-                    //     } else {
                     //         let directionY = simpPath[y + 1][1] > simpPath[y][1] ? 'down' : 'up'
+                    //         console.log(directionX, directionY)
                     //         for (let x = 1; x < 5; x++) {
-                    //             if (directionY == 'right') {
-                    //                 let nextStep = [simpPath[y][0], simpPath[y][1] + x]
-                    //                 interpolPath.push(nextStep)
-                    //             } else {
-                    //                 let nextStep = [simpPath[y][0], simpPath[y][1] + x]
-                    //                 interpolPath.push(nextStep)
-                    //             }
+                    //             let nextStep;
+                    //             if (directionX == 'right') nextStep = [simpPath[y][0] + x, simpPath[y + 1][1]]
+                    //             if (directionY == 'down') nextStep = [simpPath[y + 1][0], simpPath[y][1] - x]
+                    //             console.log(y * 4 + x, nextStep)
+                    //             interpolPath.push(nextStep)
                     //         }
-
                     //     }
-
-
-                    //     // if (y !== simpPath.length - 1) {
-                    //     //     let directionX = simpPath[y + 1][0] > simpPath[y][0] ? 'right' : 'left'
-                    //     //     let directionY = simpPath[y + 1][1] > simpPath[y][1] ? 'down' : 'up'
-                    //     //     console.log(directionX, directionY)
-                    //     //         let nextStep;
-                    //     //         if (directionX == 'right') nextStep = [simpPath[y][0] + x, simpPath[y + 1][1]]
-                    //     //         if (directionY == 'down') nextStep = [simpPath[y + 1][0], simpPath[y][1] - x]
-                    //     //         console.log(y * 4 + x, nextStep)
-                    //     //         interpolPath.push(nextStep)
-                    //     //     }
-                    //     // }
                     // }
 
-                    // console.log('path', path.length)
-                    // console.log('simp', simpPath.length)
+                    console.log('path', path.length)
+                    console.log('simp', simpPath.length)
                     // console.log('interpolPAth:', interpolPath.length)
 
                     // PF.Util.expandPath(
                     // path = PF.Util.expandPath(PF.Util.smoothenPath(grid.clone(), path));
 
-                    // path = interpolatedPath
+                    path = simpPath
 
                     if (path.length > 0) {
                         this.state.players[client.sessionId].x = roundedX;

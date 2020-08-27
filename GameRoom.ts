@@ -5,6 +5,7 @@ import crypto from 'crypto'
 import querystring from 'querystring'
 import fs from 'fs';
 import get from 'lodash/get'
+import inRange from 'lodash/inRange'
 import isNumber from 'lodash/isNumber'
 // import * as Sentry from '@sentry/node';
 import PF from 'pathfinding';
@@ -58,6 +59,8 @@ class IP extends Schema {
 class Waypoint extends Schema {
     @type("number") x: number;
     @type("number") y: number;
+    @type("number") steps: number;
+    @type("string") direction: string;
 }
 
 class Path extends Schema {
@@ -235,46 +238,78 @@ export class GameRoom extends Room {
 
                     // for (let i = 0; i < path.length; i = i + 8) {
 
+                    const SIMPLIFICATION_FACTOR = 8
                     let i = 0;
+                    let finalPath = new Path();
                     while (true) {
-                        if (i <= path.length) {
-                            // if (path.length - i < 3) {
-                            //     console.log('diff', path.length - i)
-                            //     simpPath.push(path[path.length - 1]);
-                            // }
-                            simpPath.push(path[i]);
-                        } else {
-                            break
-                        }
                         console.log('length', path.length)
                         console.log('i', i)
                         console.log('=======')
-                        i = i + 8
+                        // if (path.length - i < 3) {
+                        //     console.log('diff', path.length - i)
+                        //     simpPath.push(path[path.length - 1]);
+                        // }
+                        let currentWaypoint = new Waypoint();
+                        const nextIndex = i + SIMPLIFICATION_FACTOR >= (path.length - 1) ? (path.length - 1) : i + SIMPLIFICATION_FACTOR
+                        // const prevIndex = i - SIMPLIFICATION_FACTOR >= (path.length - 1) ? (path.length - 1) : i + SIMPLIFICATION_FACTOR
+                        console.log(nextIndex)
+
+                        console.dir(path[i])
+
+                        currentWaypoint.x = path[i][0] * 10;
+                        currentWaypoint.y = path[i][1] * 10;
+
+                        // CALCULATE DEGREES
+                        let delta_x = currentWaypoint.x - path[nextIndex][0] * 10;
+                        let delta_y = path[nextIndex][1] * 10 - currentWaypoint.y;
+                        let theta_degrees = Math.atan2(delta_y, delta_x) * (180 / Math.PI);
+                        console.log("degrees:", theta_degrees);
+                        if (inRange(theta_degrees, -20, -181)) {
+                            currentWaypoint.direction = 'back';
+                        } else if (inRange(theta_degrees, 20, 160)) {
+                            currentWaypoint.direction = 'front';
+                        } else if (inRange(theta_degrees, 160, 181)) {
+                            currentWaypoint.direction = 'right';
+                        } else if (inRange(theta_degrees, -20, 20)) {
+                            currentWaypoint.direction = 'left';
+                        }
+
+                        console.log("direction:", currentWaypoint.direction);
+
+                        // RECTIFY 
+                        // recursive function to feed nexgt value?
+                        if (currentWaypoint.direction == "back" || currentWaypoint.direction == "front") {
+                            console.log('rectify X')
+                            currentWaypoint.steps = Math.abs(path[nextIndex][1] - path[i][1]) * 10
+                            console.log('pre:', path[nextIndex][0])
+                            path[nextIndex][0] = path[i][0];
+                            console.log('post:', path[nextIndex][0])
+                        } else if (currentWaypoint.direction == "left" || currentWaypoint.direction == "right") {
+                            console.log('rectify Y')
+                            path[nextIndex][1] = path[i][1];
+                            currentWaypoint.steps = Math.abs(path[nextIndex][0] - path[i][0]) * 10
+                        }
+
+                        // !!!! TODO calculate current AREA
+
+                        finalPath.waypoints.push(currentWaypoint);
+
+                        if (nextIndex == (path.length - 1)) {
+                            break
+                        } else {
+                            i = i + SIMPLIFICATION_FACTOR
+                        }
                     }
-
-
-
-                    // console.log('path', path.length)
-                    // console.log('simp', simpPath.length)
-                    // console.log('interpolPAth:', interpolPath.length)
 
                     // PF.Util.expandPath(
                     // path = PF.Util.expandPath(PF.Util.smoothenPath(grid.clone(), path));
 
-                    path = simpPath
-
-                    if (path.length > 0) {
-                        this.state.players[client.sessionId].x = roundedX;
-                        this.state.players[client.sessionId].y = roundedY;
-                        this.state.players[client.sessionId].path = new Path();
-                        path.forEach(wp => {
-                            let tempWp = new Waypoint()
-                            tempWp.x = wp[0] * 10
-                            tempWp.y = wp[1] * 10
-                            this.state.players[client.sessionId].path.waypoints.push(tempWp)
-                        })
-                        let lastWaypoint = path.slice(-1)[0]
-                        this.state.players[client.sessionId].area = mapMatrix[lastWaypoint[1]][lastWaypoint[0]]
+                    if (finalPath.waypoints.length > 0) {
+                        this.state.players[client.sessionId].x = finalPath.waypoints[0].x;
+                        this.state.players[client.sessionId].y = finalPath.waypoints[0].y;
+                        this.state.players[client.sessionId].path = finalPath;
+                        // let lastWaypoint = path.slice(-1)[0]
+                        // this.state.players[client.sessionId].area = mapMatrix[lastWaypoint[1]][lastWaypoint[0]]
                     } else {
                         client.send('illegalMove', {})
                     }

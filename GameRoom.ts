@@ -193,17 +193,12 @@ export class GameRoom extends Room {
                         loResRoundedY,
                         grid.clone());
 
-                    console.dir(path)
+                    // console.dir(path)
                     // // var maxVal = 4;
-                    // let culledPath: number[][] = [];
 
                     // // var delta = Math.floor(path.length / maxVal);
 
                     // // console.log(delta)
-
-                    // for (let i = 0; i < path.length; i = i + 4) {
-                    //     culledPath.push(path[i]);
-                    // }
 
                     // let interpolatedPath: number[][] = [];
 
@@ -236,8 +231,31 @@ export class GameRoom extends Room {
                     //     }
                     // }
 
-                    console.log('path', path.length)
-                    console.log('simp', simpPath.length)
+                    let simpPath: number[][] = [];
+
+                    // for (let i = 0; i < path.length; i = i + 8) {
+
+                    let i = 0;
+                    while (true) {
+                        if (i <= path.length) {
+                            // if (path.length - i < 3) {
+                            //     console.log('diff', path.length - i)
+                            //     simpPath.push(path[path.length - 1]);
+                            // }
+                            simpPath.push(path[i]);
+                        } else {
+                            break
+                        }
+                        console.log('length', path.length)
+                        console.log('i', i)
+                        console.log('=======')
+                        i = i + 8
+                    }
+
+
+
+                    // console.log('path', path.length)
+                    // console.log('simp', simpPath.length)
                     // console.log('interpolPAth:', interpolPath.length)
 
                     // PF.Util.expandPath(

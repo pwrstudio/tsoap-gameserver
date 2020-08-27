@@ -167,21 +167,6 @@ export class GameRoom extends Room {
                 let loResRoundedY = roundedY / 10
                 let loResRoundedX = roundedX / 10
 
-                // let tinyRoundedY = Math.ceil(roundedY / 40)
-                // let tinyRoundedX = Math.ceil(roundedX / 40)
-
-                // console.log(tinyRoundedY)
-                // console.log(tinyRoundedX)
-
-
-
-                // console.log('iswalkable', grid.isWalkableAt(loResRoundedX, loResRoundedY))
-
-                // console.dir(grid.getNodeAt(loResRoundedX, loResRoundedY))
-                // console.dir(mapMatrix[loResRoundedX][loResRoundedY])
-
-                // console.log(grid.isWalkableAt(tinyRoundedX, tinyRoundedY))
-
                 if (grid.isWalkableAt(loResRoundedX, loResRoundedY)) {
 
                     // console.log('start X:', this.state.players[client.sessionId].x / 10)
@@ -196,74 +181,39 @@ export class GameRoom extends Room {
                         loResRoundedY,
                         grid.clone());
 
-                    // console.dir(path)
-                    // // var maxVal = 4;
+                    let pathObj = path.map(wp => {
+                        return ({ x: wp[0] * 10, y: wp[1] * 10, steps: 120, direction: '' })
+                    })
 
-                    // // var delta = Math.floor(path.length / maxVal);
+                    // console.dir(pathObj)
 
-                    // // console.log(delta)
-
-                    // let interpolatedPath: number[][] = [];
-
-                    // console.log(culledPath.length)
-
-                    // // for (let i = 0; i < culledPath.length; i++) {
-                    // culledPath.forEach((node, i) => {
-
-                    //     if (i !== culledPath.length - 1) {
-                    //         let currentPoint = culledPath[i];
-                    //         let nextPoint = culledPath[i + 1];
-
-
-                    // let interpolPath = []
-
-                    // for (let y = 0; y < simpPath.length; y++) {
-                    //     console.log(y * 4, simpPath[y])
-                    //     interpolPath.push(simpPath[y])
-                    //     if (y !== simpPath.length - 1) {
-                    //         let directionX = simpPath[y + 1][0] > simpPath[y][0] ? 'right' : 'left'
-                    //         let directionY = simpPath[y + 1][1] > simpPath[y][1] ? 'down' : 'up'
-                    //         console.log(directionX, directionY)
-                    //         for (let x = 1; x < 5; x++) {
-                    //             let nextStep;
-                    //             if (directionX == 'right') nextStep = [simpPath[y][0] + x, simpPath[y + 1][1]]
-                    //             if (directionY == 'down') nextStep = [simpPath[y + 1][0], simpPath[y][1] - x]
-                    //             console.log(y * 4 + x, nextStep)
-                    //             interpolPath.push(nextStep)
-                    //         }
-                    //     }
-                    // }
-
-                    let simpPath: number[][] = [];
-
-                    // for (let i = 0; i < path.length; i = i + 8) {
 
                     const SIMPLIFICATION_FACTOR = 8
-                    let i = 0;
                     let finalPath = new Path();
-                    while (true) {
-                        console.log('length', path.length)
-                        console.log('i', i)
+
+                    console.log('PLAYER X:', this.state.players[client.sessionId].x)
+                    console.log('PLAYER Y:', this.state.players[client.sessionId].y)
+                    console.log('FIRST PATH X:', pathObj[0].x)
+                    console.log('FIRST PATH Y:', pathObj[0].y)
+
+                    const processPath = (index = 0) => {
+                        const nextIndex = index + SIMPLIFICATION_FACTOR >= (pathObj.length - 1) ? (pathObj.length - 1) : index + SIMPLIFICATION_FACTOR
+                        const prevIndex = index == 0 ? 0 : index - SIMPLIFICATION_FACTOR
+                        console.log('length', pathObj.length - 1)
+                        console.log('index', index)
+                        console.log('next index', nextIndex)
+                        console.log('prev index', prevIndex)
                         console.log('=======')
-                        // if (path.length - i < 3) {
-                        //     console.log('diff', path.length - i)
-                        //     simpPath.push(path[path.length - 1]);
-                        // }
+
                         let currentWaypoint = new Waypoint();
-                        const nextIndex = i + SIMPLIFICATION_FACTOR >= (path.length - 1) ? (path.length - 1) : i + SIMPLIFICATION_FACTOR
-                        // const prevIndex = i - SIMPLIFICATION_FACTOR >= (path.length - 1) ? (path.length - 1) : i + SIMPLIFICATION_FACTOR
-                        console.log(nextIndex)
+                        currentWaypoint.x = pathObj[index].x;
+                        currentWaypoint.y = pathObj[index].y;
 
-                        console.dir(path[i])
-
-                        currentWaypoint.x = path[i][0] * 10;
-                        currentWaypoint.y = path[i][1] * 10;
-
-                        // CALCULATE DEGREES
-                        let delta_x = currentWaypoint.x - path[nextIndex][0] * 10;
-                        let delta_y = path[nextIndex][1] * 10 - currentWaypoint.y;
+                        // CALCULATE DIRECTION
+                        let delta_x = pathObj[prevIndex].x - currentWaypoint.x;
+                        let delta_y = currentWaypoint.y - pathObj[prevIndex].y;
                         let theta_degrees = Math.atan2(delta_y, delta_x) * (180 / Math.PI);
-                        console.log("degrees:", theta_degrees);
+                        // console.log("degrees:", theta_degrees);
                         if (inRange(theta_degrees, -20, -181)) {
                             currentWaypoint.direction = 'back';
                         } else if (inRange(theta_degrees, 20, 160)) {
@@ -273,41 +223,45 @@ export class GameRoom extends Room {
                         } else if (inRange(theta_degrees, -20, 20)) {
                             currentWaypoint.direction = 'left';
                         }
+                        // console.log("direction:", currentWaypoint.direction);
 
-                        console.log("direction:", currentWaypoint.direction);
-
-                        // RECTIFY 
-                        // recursive function to feed nexgt value?
+                        // RECTIFY & CALCULATE STEPS
                         if (currentWaypoint.direction == "back" || currentWaypoint.direction == "front") {
-                            console.log('rectify X')
-                            currentWaypoint.steps = Math.abs(path[nextIndex][1] - path[i][1]) * 10
-                            console.log('pre:', path[nextIndex][0])
-                            path[nextIndex][0] = path[i][0];
-                            console.log('post:', path[nextIndex][0])
+                            // console.log('rectify X')
+                            currentWaypoint.steps = Math.abs(currentWaypoint.y - pathObj[prevIndex].y)
+                            pathObj[nextIndex].x = currentWaypoint.x;
                         } else if (currentWaypoint.direction == "left" || currentWaypoint.direction == "right") {
-                            console.log('rectify Y')
-                            path[nextIndex][1] = path[i][1];
-                            currentWaypoint.steps = Math.abs(path[nextIndex][0] - path[i][0]) * 10
+                            // console.log('rectify Y')+
+                            currentWaypoint.steps = Math.abs(currentWaypoint.x - pathObj[prevIndex].x)
+                            pathObj[nextIndex].y = currentWaypoint.y;
                         }
 
                         // !!!! TODO calculate current AREA
 
+                        console.log("=> ADDING WAYPOINT:", index);
+                        console.log("–– X:", currentWaypoint.x);
+                        console.log("–– Y:", currentWaypoint.y);
+                        console.log("–– Direction:", currentWaypoint.direction);
+                        console.log("–– Steps:", currentWaypoint.steps);
+                        console.log("= = = = =");
                         finalPath.waypoints.push(currentWaypoint);
 
-                        if (nextIndex == (path.length - 1)) {
-                            break
+                        if (index == (pathObj.length - 1)) {
+                            this.state.players[client.sessionId].x = currentWaypoint.x;
+                            this.state.players[client.sessionId].y = currentWaypoint.y;
+                            this.state.players[client.sessionId].path = finalPath;
+                            // console.dir(finalPath.waypoints)
+                            // finalPath.waypoints.forEach(p => console.dir(p))
+                            return
                         } else {
-                            i = i + SIMPLIFICATION_FACTOR
+                            processPath(nextIndex)
                         }
+
                     }
 
-                    // PF.Util.expandPath(
-                    // path = PF.Util.expandPath(PF.Util.smoothenPath(grid.clone(), path));
 
-                    if (finalPath.waypoints.length > 0) {
-                        this.state.players[client.sessionId].x = finalPath.waypoints[0].x;
-                        this.state.players[client.sessionId].y = finalPath.waypoints[0].y;
-                        this.state.players[client.sessionId].path = finalPath;
+                    if (pathObj.length > 0) {
+                        processPath(SIMPLIFICATION_FACTOR)
                         // let lastWaypoint = path.slice(-1)[0]
                         // this.state.players[client.sessionId].area = mapMatrix[lastWaypoint[1]][lastWaypoint[0]]
                     } else {

@@ -80,6 +80,7 @@ class Player extends Schema {
     @type("number") area: number;
     @type("boolean") authenticated: boolean;
     @type(Path) path: Path = new Path();
+    @type(Path) fullPath: Path = new Path();
 }
 
 class Message extends Schema {
@@ -187,6 +188,17 @@ export class GameRoom extends Room {
 
                     // console.dir(pathObj)
 
+                    let fullPath = new Path()
+                    pathObj.forEach(wp => {
+                        let temp = new Waypoint();
+                        temp.x = wp.x
+                        temp.y = wp.y
+                        temp.direction = 'front'
+                        temp.steps = 0
+                        fullPath.waypoints.push(temp)
+                    })
+
+                    console.dir(fullPath)
 
                     const SIMPLIFICATION_FACTOR = 8
                     let finalPath = new Path();
@@ -250,6 +262,7 @@ export class GameRoom extends Room {
                             this.state.players[client.sessionId].x = currentWaypoint.x;
                             this.state.players[client.sessionId].y = currentWaypoint.y;
                             this.state.players[client.sessionId].path = finalPath;
+                            this.state.players[client.sessionId].fullPath = fullPath;
                             // console.dir(finalPath.waypoints)
                             // finalPath.waypoints.forEach(p => console.dir(p))
                             return

@@ -168,7 +168,7 @@ export class GameRoom extends Room {
 
                                 console.dir(fullPath)
 
-                                const SIMPLIFICATION_FACTOR = 8
+                                const SIMPLIFICATION_FACTOR = 1
                                 let finalPath = new Path();
 
                                 console.log('PLAYER X:', this.state.players[client.sessionId].x)
@@ -211,21 +211,21 @@ export class GameRoom extends Room {
                                     if (currentWaypoint.direction == "back" || currentWaypoint.direction == "front") {
                                         currentWaypoint.steps = Math.abs(currentWaypoint.y - pathObj[prevIndex].y)
                                         console.log('rectify X')
-                                        if(nextIndex !== (pathObj.length - 1)) {
-                                            pathObj[nextIndex].x = currentWaypoint.x;                                            
-                                        } else {
-                                            console.log('§§§§§ FINAL ITERATION')
-                                            console.log(nextIndex)
-                                        }
+                                        // if(nextIndex !== (pathObj.length - 1)) {
+                                        //     pathObj[nextIndex].x = currentWaypoint.x;                                            
+                                        // } else {
+                                        //     console.log('§§§§§ FINAL ITERATION')
+                                        //     console.log(nextIndex)
+                                        // }
                                     } else if (currentWaypoint.direction == "left" || currentWaypoint.direction == "right") {
                                         currentWaypoint.steps = Math.abs(currentWaypoint.x - pathObj[prevIndex].x)
                                         console.log('rectify Y')
-                                        if(nextIndex !== (pathObj.length - 1)) {
-                                            pathObj[nextIndex].y = currentWaypoint.y;
-                                        } else {
-                                            console.log('§§§§§ FINAL ITERATION')
-                                            console.log(nextIndex)
-                                        }
+                                        // if(nextIndex !== (pathObj.length - 1)) {
+                                        //     pathObj[nextIndex].y = currentWaypoint.y;
+                                        // } else {
+                                        //     console.log('§§§§§ FINAL ITERATION')
+                                        //     console.log(nextIndex)
+                                        // }
                                     }
 
                                     // !!!! TODO calculate current AREA
@@ -247,9 +247,10 @@ export class GameRoom extends Room {
                                         processPath(nextIndex)
                                     }
                                 }
-
+                                
                                 if (pathObj.length > 0) {
                                     processPath(SIMPLIFICATION_FACTOR)
+                                    // processFullPath(1)
                                 } else {
                                     client.send('illegalMove', {})
                                 }

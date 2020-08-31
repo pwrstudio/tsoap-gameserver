@@ -1,15 +1,14 @@
 import { Room, Client } from "colyseus";
 import { Schema, MapSchema, ArraySchema, type } from "@colyseus/schema";
-// import EasyStar from 'easystarjs'
+import EasyStar from 'easystarjs'
 import crypto from 'crypto'
 import querystring from 'querystring'
 import fs from 'fs';
 import get from 'lodash/get'
 import inRange from 'lodash/inRange'
+import clamp from 'lodash/clamp'
 import isNumber from 'lodash/isNumber'
-// import * as Sentry from '@sentry/node';
-import PF from 'pathfinding';
-import { find } from "lodash";
+import * as Sentry from '@sentry/node';
 
 const SSO_SECRET = "daymoon";
 const MAX_STACK_HEIGHT = 200;
@@ -19,12 +18,6 @@ const MAX_CHATMESSAGE_LENGTH = 1000;
 const rawdata = fs.readFileSync('hkw-map-color-hard.json');
 const mapMatrix = JSON.parse(rawdata.toString()).data;
 
-const rawdataBit = fs.readFileSync('hkw-map-bit.json');
-const bitMatrix = JSON.parse(rawdataBit.toString()).data;
-
-
-// console.dir(rawdataBit)
-// console.log(bitMatrix)
 // 0 = white
 // 1 = black
 // 2 = yellow
@@ -32,25 +25,12 @@ const bitMatrix = JSON.parse(rawdataBit.toString()).data;
 // 4 = green
 // 5 = blue
 
-// const easystar = new EasyStar.js();
-// easystar.setGrid(mapMatrix)
-// easystar.setAcceptableTiles([0, 2, 3, 4, 5]);
+const easystar = new EasyStar.js();
+easystar.setGrid(mapMatrix)
+easystar.setAcceptableTiles([0, 2, 3, 4, 5]);
 // easystar.setIterationsPerCalculation(1000);
 // easystar.enableDiagonals();
 // easystar.disableCornerCutting()
-
-var grid = new PF.Grid(bitMatrix);
-
-var finder = new PF.AStarFinder({
-    heuristic: PF.Heuristic.manhattan,
-    weight: 1000,
-});
-
-// var finder = new PF.BestFirstFinder();
-
-// console.dir(grid)
-
-console.dir(finder)
 
 class IP extends Schema {
     @type("string") address: string;
@@ -133,7 +113,7 @@ export class GameRoom extends Room {
                 }
             } catch (err) {
                 console.log(err)
-                // Sentry.captureException(err);
+                Sentry.captureException(err);
             }
         });
 
@@ -145,21 +125,14 @@ export class GameRoom extends Room {
                 this.state.blacklist.splice(itemIndex, 1);
             } catch (err) {
                 console.log(err)
-
-                // Sentry.captureException(err);
+                Sentry.captureException(err);
             }
         });
 
         this.onMessage("go", (client, message) => {
             try {
-                let roundedX = Math.ceil(get(message, 'x', 0) / 10) * 10
-                let roundedY = Math.ceil(get(message, 'y', 0) / 10) * 10
-
-                if (roundedX > 5000) roundedX = 4990
-                if (roundedX < 0) roundedX = 0
-
-                if (roundedY > 5000) roundedY = 4990
-                if (roundedY < 0) roundedY = 0
+                let roundedX = clamp(Math.ceil(get(message, 'x', 0) / 10) * 10, 0, 4990)
+                let roundedY = clamp(Math.ceil(get(message, 'y', 0) / 10) * 10, 0, 4990)
 
                 console.log('Y', roundedY)
                 console.log('X', roundedX)
@@ -168,142 +141,122 @@ export class GameRoom extends Room {
                 let loResRoundedY = roundedY / 10
                 let loResRoundedX = roundedX / 10
 
-                if (grid.isWalkableAt(loResRoundedX, loResRoundedY)) {
+                if (mapMatrix[loResRoundedX][loResRoundedY] !== 1) {
 
-                    // console.log('start X:', this.state.players[client.sessionId].x / 10)
-                    // console.log('start Y:', this.state.players[client.sessionId].y / 10)
-                    // console.log('end X:', loResRoundedX)
-                    // console.log('end Y:', loResRoundedY)
-
-                    let path = finder.findPath(
-                        this.state.players[client.sessionId].x / 10,
+                    easystar.findPath(this.state.players[client.sessionId].x / 10,
                         this.state.players[client.sessionId].y / 10,
                         loResRoundedX,
-                        loResRoundedY,
-                        grid.clone());
+                        loResRoundedY, path => {
+                            if (path === null) {
+                                console.error('no path')
+                            } else {
+                                console.dir(path)
 
-                    let pathObj = path.map(wp => {
-                        return ({ x: wp[0] * 10, y: wp[1] * 10, steps: 120, direction: '' })
-                    })
+                                let pathObj = path.map(wp => {
+                                    return ({ x: wp.x * 10, y: wp.y * 10, steps: 120, direction: '' })
+                                })
 
-                    // console.dir(pathObj)
+                                let fullPath = new Path()
+                                pathObj.forEach(wp => {
+                                    let temp = new Waypoint();
+                                    temp.x = wp.x
+                                    temp.y = wp.y
+                                    temp.direction = 'front'
+                                    temp.steps = 0
+                                    fullPath.waypoints.push(temp)
+                                })
 
-                    let fullPath = new Path()
-                    pathObj.forEach(wp => {
-                        let temp = new Waypoint();
-                        temp.x = wp.x
-                        temp.y = wp.y
-                        temp.direction = 'front'
-                        temp.steps = 0
-                        fullPath.waypoints.push(temp)
-                    })
+                                console.dir(fullPath)
 
-                    console.dir(fullPath)
+                                const SIMPLIFICATION_FACTOR = 8
+                                let finalPath = new Path();
 
-                    const SIMPLIFICATION_FACTOR = 8
-                    let finalPath = new Path();
+                                console.log('PLAYER X:', this.state.players[client.sessionId].x)
+                                console.log('PLAYER Y:', this.state.players[client.sessionId].y)
+                                console.log('FIRST PATH X:', pathObj[0].x)
+                                console.log('FIRST PATH Y:', pathObj[0].y)
 
-                    console.log('PLAYER X:', this.state.players[client.sessionId].x)
-                    console.log('PLAYER Y:', this.state.players[client.sessionId].y)
-                    console.log('FIRST PATH X:', pathObj[0].x)
-                    console.log('FIRST PATH Y:', pathObj[0].y)
+                                const processPath = (index = 0) => {
+                                    const nextIndex = index + SIMPLIFICATION_FACTOR >= (pathObj.length - 1) 
+                                                        ? pathObj.length - 1 
+                                                        : index + SIMPLIFICATION_FACTOR
+                                    const prevIndex = index == 0 
+                                                        ? 0 
+                                                        : index - SIMPLIFICATION_FACTOR
+                                    console.log('length', pathObj.length - 1)
+                                    console.log('index', index)
+                                    console.log('next index', nextIndex)
+                                    console.log('prev index', prevIndex)
+                                    console.log('=======')
 
-                    const processPath = (index = 0) => {
-                        const nextIndex = index + SIMPLIFICATION_FACTOR >= (pathObj.length - 1) ? (pathObj.length - 1) : index + SIMPLIFICATION_FACTOR
-                        const prevIndex = index == 0 ? 0 : index - SIMPLIFICATION_FACTOR
-                        console.log('length', pathObj.length - 1)
-                        console.log('index', index)
-                        console.log('next index', nextIndex)
-                        console.log('prev index', prevIndex)
-                        console.log('=======')
+                                    let currentWaypoint = new Waypoint();
+                                    currentWaypoint.x = pathObj[index].x;
+                                    currentWaypoint.y = pathObj[index].y;
 
-                        let currentWaypoint = new Waypoint();
-                        currentWaypoint.x = pathObj[index].x;
-                        currentWaypoint.y = pathObj[index].y;
+                                    // CALCULATE DIRECTION
+                                    let delta_x = pathObj[prevIndex].x - currentWaypoint.x;
+                                    let delta_y = currentWaypoint.y - pathObj[prevIndex].y;
+                                    let theta_degrees = Math.atan2(delta_y, delta_x) * (180 / Math.PI);
+                                    if (inRange(theta_degrees, -10, -181)) {
+                                        currentWaypoint.direction = 'back';
+                                    } else if (inRange(theta_degrees, 10, 170)) {
+                                        currentWaypoint.direction = 'front';
+                                    } else if (inRange(theta_degrees, 170, 181)) {
+                                        currentWaypoint.direction = 'right';
+                                    } else if (inRange(theta_degrees, -20, 10)) {
+                                        currentWaypoint.direction = 'left';
+                                    }
 
-                        // CALCULATE DIRECTION
-                        let delta_x = pathObj[prevIndex].x - currentWaypoint.x;
-                        let delta_y = currentWaypoint.y - pathObj[prevIndex].y;
-                        let theta_degrees = Math.atan2(delta_y, delta_x) * (180 / Math.PI);
-                        // console.log("degrees:", theta_degrees);
-                        if (inRange(theta_degrees, -20, -181)) {
-                            currentWaypoint.direction = 'back';
-                        } else if (inRange(theta_degrees, 20, 160)) {
-                            currentWaypoint.direction = 'front';
-                        } else if (inRange(theta_degrees, 160, 181)) {
-                            currentWaypoint.direction = 'right';
-                        } else if (inRange(theta_degrees, -20, 20)) {
-                            currentWaypoint.direction = 'left';
-                        }
-                        // console.log("direction:", currentWaypoint.direction);
+                                    // RECTIFY & CALCULATE STEPS
+                                    if (currentWaypoint.direction == "back" || currentWaypoint.direction == "front") {
+                                        currentWaypoint.steps = Math.abs(currentWaypoint.y - pathObj[prevIndex].y)
+                                        console.log('rectify X')
+                                        if(nextIndex !== (pathObj.length - 1)) {
+                                            pathObj[nextIndex].x = currentWaypoint.x;                                            
+                                        } else {
+                                            console.log('§§§§§ FINAL ITERATION')
+                                            console.log(nextIndex)
+                                        }
+                                    } else if (currentWaypoint.direction == "left" || currentWaypoint.direction == "right") {
+                                        currentWaypoint.steps = Math.abs(currentWaypoint.x - pathObj[prevIndex].x)
+                                        console.log('rectify Y')
+                                        if(nextIndex !== (pathObj.length - 1)) {
+                                            pathObj[nextIndex].y = currentWaypoint.y;
+                                        } else {
+                                            console.log('§§§§§ FINAL ITERATION')
+                                            console.log(nextIndex)
+                                        }
+                                    }
 
-                        // RECTIFY & CALCULATE STEPS
-                        if (currentWaypoint.direction == "back" || currentWaypoint.direction == "front") {
-                            // console.log('rectify X')
-                            currentWaypoint.steps = Math.abs(currentWaypoint.y - pathObj[prevIndex].y)
-                            pathObj[nextIndex].x = currentWaypoint.x;
-                        } else if (currentWaypoint.direction == "left" || currentWaypoint.direction == "right") {
-                            // console.log('rectify Y')+
-                            currentWaypoint.steps = Math.abs(currentWaypoint.x - pathObj[prevIndex].x)
-                            pathObj[nextIndex].y = currentWaypoint.y;
-                        }
+                                    // !!!! TODO calculate current AREA
+                                    console.log("=> ADDING WAYPOINT:", index);
+                                    console.log("–– X:", currentWaypoint.x);
+                                    console.log("–– Y:", currentWaypoint.y);
+                                    console.log("–– Direction:", currentWaypoint.direction);
+                                    console.log("–– Steps:", currentWaypoint.steps);
+                                    console.log("= = = = =");
+                                    finalPath.waypoints.push(currentWaypoint);
 
-                        // !!!! TODO calculate current AREA
+                                    if (index == (pathObj.length - 1)) {
+                                        this.state.players[client.sessionId].x = currentWaypoint.x;
+                                        this.state.players[client.sessionId].y = currentWaypoint.y;
+                                        this.state.players[client.sessionId].path = finalPath;
+                                        this.state.players[client.sessionId].fullPath = fullPath;
+                                        return
+                                    } else {
+                                        processPath(nextIndex)
+                                    }
+                                }
 
-                        console.log("=> ADDING WAYPOINT:", index);
-                        console.log("–– X:", currentWaypoint.x);
-                        console.log("–– Y:", currentWaypoint.y);
-                        console.log("–– Direction:", currentWaypoint.direction);
-                        console.log("–– Steps:", currentWaypoint.steps);
-                        console.log("= = = = =");
-                        finalPath.waypoints.push(currentWaypoint);
-
-                        if (index == (pathObj.length - 1)) {
-                            this.state.players[client.sessionId].x = currentWaypoint.x;
-                            this.state.players[client.sessionId].y = currentWaypoint.y;
-                            this.state.players[client.sessionId].path = finalPath;
-                            this.state.players[client.sessionId].fullPath = fullPath;
-                            // console.dir(finalPath.waypoints)
-                            // finalPath.waypoints.forEach(p => console.dir(p))
-                            return
-                        } else {
-                            processPath(nextIndex)
-                        }
-
-                    }
-
-
-                    if (pathObj.length > 0) {
-                        processPath(SIMPLIFICATION_FACTOR)
-                        // let lastWaypoint = path.slice(-1)[0]
-                        // this.state.players[client.sessionId].area = mapMatrix[lastWaypoint[1]][lastWaypoint[0]]
-                    } else {
-                        client.send('illegalMove', {})
-                    }
-
-
-                    // easystar.findPath(this.state.players[client.sessionId].x / 10,
-                    //     this.state.players[client.sessionId].y / 10,
-                    //     roundedX / 10,
-                    //     roundedY / 10, path => {
-                    //         if (path === null) {
-                    //             console.error('no path')
-                    //         } else {
-                    //             this.state.players[client.sessionId].x = roundedX;
-                    //             this.state.players[client.sessionId].y = roundedY;
-                    //             this.state.players[client.sessionId].path = new Path();
-                    //             path.forEach(wp => {
-                    //                 let tempWp = new Waypoint()
-                    //                 tempWp.y = wp.y * 10
-                    //                 tempWp.x = wp.x * 10
-                    //                 this.state.players[client.sessionId].path.waypoints.push(tempWp)
-                    //             })
-                    //             let lastWaypoint = path.slice(-1)[0]
-                    //             this.state.players[client.sessionId].area = mapMatrix[get(lastWaypoint, 'y', 0)][get(lastWaypoint, 'x', 0)]
-                    //         }
-                    //     });
-
-                    // easystar.calculate();
+                                if (pathObj.length > 0) {
+                                    processPath(SIMPLIFICATION_FACTOR)
+                                } else {
+                                    client.send('illegalMove', {})
+                                }
+                            }
+                        });
+    
+                    easystar.calculate();
 
                 } else {
                     // TODO: find closes allowed position
@@ -311,8 +264,7 @@ export class GameRoom extends Room {
                 }
             } catch (err) {
                 console.log(err)
-
-                // Sentry.captureException(err);
+                Sentry.captureException(err);
             }
 
         });
@@ -350,9 +302,10 @@ export class GameRoom extends Room {
                 console.log('- - - - - ')
 
                 this.state.players[client.sessionId].area = colorIndex
+                this.state.players[client.sessionId].path = new Path()
+                this.state.players[client.sessionId].fullPath = new Path()
                 this.state.players[client.sessionId].x = newX
                 this.state.players[client.sessionId].y = newY
-
             }
 
         })
@@ -374,8 +327,7 @@ export class GameRoom extends Room {
                 }
             } catch (err) {
                 console.log(err)
-
-                // Sentry.captureException(err);
+                Sentry.captureException(err);
             }
         });
 
@@ -387,7 +339,7 @@ export class GameRoom extends Room {
                 }
             } catch (err) {
                 console.log(err)
-                // Sentry.captureException(err);
+                Sentry.captureException(err);
             }
         });
 
@@ -408,7 +360,6 @@ export class GameRoom extends Room {
         })
 
         // joinPrivateRoom
-
 
     }
 
@@ -477,8 +428,7 @@ export class GameRoom extends Room {
 
             } catch (err) {
                 console.log(err)
-
-                // Sentry.captureException(err);
+                Sentry.captureException(err);
             }
         }
     }
@@ -486,12 +436,6 @@ export class GameRoom extends Room {
     async onLeave(client: Client, consented: boolean) {
         console.log('LEFT')
         delete this.state.players[client.sessionId];
-
-        // try {
-        //     console.log('Left:', this.state.players[client.sessionId].name)
-        // } catch (err) {
-        //     Sentry.captureException(err);
-        // }
     }
 
     onDispose() {

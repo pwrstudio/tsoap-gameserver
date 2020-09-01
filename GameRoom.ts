@@ -18,6 +18,22 @@ const MAX_CHATMESSAGE_LENGTH = 1000;
 const rawdata = fs.readFileSync('hkw-map-color-hard.json');
 const mapMatrix = JSON.parse(rawdata.toString()).data;
 
+// const smallMatrix = []
+
+// for(let row = 0; row < mapMatrix.length; row += 5) {
+//     // console.log(row)
+//     let temp = []
+//     for(let col = 0; col < mapMatrix[row].length; col += 5) {
+//         temp.push(mapMatrix[row][col])
+//     }
+//     smallMatrix.push(temp)
+// }
+
+// console.dir(smallMatrix)
+
+// console.log(smallMatrix.length)
+
+// TILE TYPES =>
 // 0 = white
 // 1 = black
 // 2 = yellow
@@ -27,10 +43,8 @@ const mapMatrix = JSON.parse(rawdata.toString()).data;
 
 const easystar = new EasyStar.js();
 easystar.setGrid(mapMatrix)
+// easystar.setGrid(smallMatrix)
 easystar.setAcceptableTiles([0, 2, 3, 4, 5]);
-// easystar.setIterationsPerCalculation(1000);
-// easystar.enableDiagonals();
-// easystar.disableCornerCutting()
 
 class IP extends Schema {
     @type("string") address: string;
@@ -41,6 +55,15 @@ class Waypoint extends Schema {
     @type("number") y: number;
     @type("number") steps: number;
     @type("string") direction: string;
+
+    constructor (x:number, y:number, direction?:string, steps?:number) {
+        super({});
+
+        this.x = x
+        this.y = y
+        this.direction = direction
+        this.steps = steps
+    }
 }
 
 class Path extends Schema {
@@ -134,9 +157,9 @@ export class GameRoom extends Room {
                 let roundedX = clamp(Math.ceil(get(message, 'x', 0) / 10) * 10, 0, 4990)
                 let roundedY = clamp(Math.ceil(get(message, 'y', 0) / 10) * 10, 0, 4990)
 
-                console.log('Y', roundedY)
-                console.log('X', roundedX)
-                console.log('- - - - - ')
+                // console.log('Y', roundedY)
+                // console.log('X', roundedX)
+                // console.log('- - - - - ')
 
                 let loResRoundedY = roundedY / 10
                 let loResRoundedX = roundedX / 10
@@ -149,83 +172,78 @@ export class GameRoom extends Room {
                         loResRoundedY, path => {
                             if (path === null) {
                                 console.error('no path')
+                                client.send('illegalMove', {})
                             } else {
-                                console.dir(path)
-
-                                let pathObj = path.map(wp => {
-                                    return ({ x: wp.x * 10, y: wp.y * 10, steps: 120, direction: '' })
-                                })
+                                // console.dir(path)
 
                                 let fullPath = new Path()
-                                pathObj.forEach(wp => {
-                                    let temp = new Waypoint();
-                                    temp.x = wp.x
-                                    temp.y = wp.y
-                                    temp.direction = 'front'
-                                    temp.steps = 0
-                                    fullPath.waypoints.push(temp)
+                                path.forEach(wp => {
+                                    fullPath.waypoints.push(new Waypoint(wp.x * 10, wp.y * 10, '', 10))
                                 })
+                                // console.dir(fullPath)
 
-                                console.dir(fullPath)
-
-                                const SIMPLIFICATION_FACTOR = 8
+                                const SIMPLIFICATION_FACTOR = 1
                                 let finalPath = new Path();
 
-                                console.log('PLAYER X:', this.state.players[client.sessionId].x)
-                                console.log('PLAYER Y:', this.state.players[client.sessionId].y)
-                                console.log('FIRST PATH X:', pathObj[0].x)
-                                console.log('FIRST PATH Y:', pathObj[0].y)
+                                // console.log('PLAYER X:', this.state.players[client.sessionId].x)
+                                // console.log('PLAYER Y:', this.state.players[client.sessionId].y)
+                                // console.log('FIRST PATH X:', fullPath.waypoints[0].x)
+                                // console.log('FIRST PATH Y:', fullPath.waypoints[0].y)
 
                                 const processPath = (index = 0) => {
-                                    const nextIndex = index + SIMPLIFICATION_FACTOR >= (pathObj.length - 1) 
-                                                        ? pathObj.length - 1 
+                                    const nextIndex = index + SIMPLIFICATION_FACTOR >= (fullPath.waypoints.length - 1) 
+                                                        ? fullPath.waypoints.length - 1 
                                                         : index + SIMPLIFICATION_FACTOR
                                     const prevIndex = index == 0 
                                                         ? 0 
                                                         : index - SIMPLIFICATION_FACTOR
-                                    console.log('length', pathObj.length - 1)
+                                    console.log('length', fullPath.waypoints.length - 1)
                                     console.log('index', index)
                                     console.log('next index', nextIndex)
                                     console.log('prev index', prevIndex)
                                     console.log('=======')
 
-                                    let currentWaypoint = new Waypoint();
-                                    currentWaypoint.x = pathObj[index].x;
-                                    currentWaypoint.y = pathObj[index].y;
+                                    let currentWaypoint = new Waypoint(fullPath.waypoints[index].x, fullPath.waypoints[index].y);
 
                                     // CALCULATE DIRECTION
-                                    let delta_x = pathObj[prevIndex].x - currentWaypoint.x;
-                                    let delta_y = currentWaypoint.y - pathObj[prevIndex].y;
+                                    let delta_x = fullPath.waypoints[prevIndex].x - currentWaypoint.x;
+                                    let delta_y = currentWaypoint.y - fullPath.waypoints[prevIndex].y;
                                     let theta_degrees = Math.atan2(delta_y, delta_x) * (180 / Math.PI);
-                                    if (inRange(theta_degrees, -10, -181)) {
+                                    console.log(theta_degrees)
+                                    // DIRECTIONS =>
+                                    // -90 === Back
+                                    //  90 === Front
+                                    // 180 === Rights
+                                    //   0 === Left
+                                    if (inRange(theta_degrees, -80, -181)) {
                                         currentWaypoint.direction = 'back';
                                     } else if (inRange(theta_degrees, 10, 170)) {
                                         currentWaypoint.direction = 'front';
-                                    } else if (inRange(theta_degrees, 170, 181)) {
+                                    } else if (inRange(theta_degrees, 170, 190)) {
                                         currentWaypoint.direction = 'right';
-                                    } else if (inRange(theta_degrees, -20, 10)) {
+                                    } else if (inRange(theta_degrees, -10, 10)) {
                                         currentWaypoint.direction = 'left';
                                     }
 
                                     // RECTIFY & CALCULATE STEPS
                                     if (currentWaypoint.direction == "back" || currentWaypoint.direction == "front") {
-                                        currentWaypoint.steps = Math.abs(currentWaypoint.y - pathObj[prevIndex].y)
-                                        console.log('rectify X')
-                                        if(nextIndex !== (pathObj.length - 1)) {
-                                            pathObj[nextIndex].x = currentWaypoint.x;                                            
-                                        } else {
-                                            console.log('§§§§§ FINAL ITERATION')
-                                            console.log(nextIndex)
-                                        }
+                                        // console.log('rectify X')
+                                        // if(nextIndex !== (fullPath.waypoints.length - 1)) {
+                                        //     fullPath.waypoints[nextIndex].x = currentWaypoint.x;                                            
+                                        // } else {
+                                        //     console.log('§§§§§ FINAL ITERATION')
+                                        //     console.log(nextIndex)
+                                        // }
+                                        currentWaypoint.steps = Math.abs(currentWaypoint.y - fullPath.waypoints[prevIndex].y)
                                     } else if (currentWaypoint.direction == "left" || currentWaypoint.direction == "right") {
-                                        currentWaypoint.steps = Math.abs(currentWaypoint.x - pathObj[prevIndex].x)
-                                        console.log('rectify Y')
-                                        if(nextIndex !== (pathObj.length - 1)) {
-                                            pathObj[nextIndex].y = currentWaypoint.y;
-                                        } else {
-                                            console.log('§§§§§ FINAL ITERATION')
-                                            console.log(nextIndex)
-                                        }
+                                        // console.log('rectify Y')
+                                        // if(nextIndex !== (fullPath.waypoints.length - 1)) {
+                                        //     fullPath.waypoints[nextIndex].y = currentWaypoint.y;
+                                        // } else {
+                                        //     console.log('§§§§§ FINAL ITERATION')
+                                        //     console.log(nextIndex)
+                                        // }
+                                        currentWaypoint.steps = Math.abs(currentWaypoint.x - fullPath.waypoints[prevIndex].x)
                                     }
 
                                     // !!!! TODO calculate current AREA
@@ -237,7 +255,7 @@ export class GameRoom extends Room {
                                     console.log("= = = = =");
                                     finalPath.waypoints.push(currentWaypoint);
 
-                                    if (index == (pathObj.length - 1)) {
+                                    if (index == (fullPath.waypoints.length - 1)) {
                                         this.state.players[client.sessionId].x = currentWaypoint.x;
                                         this.state.players[client.sessionId].y = currentWaypoint.y;
                                         this.state.players[client.sessionId].path = finalPath;
@@ -247,9 +265,10 @@ export class GameRoom extends Room {
                                         processPath(nextIndex)
                                     }
                                 }
-
-                                if (pathObj.length > 0) {
+                                
+                                if (fullPath.waypoints.length > 0) {
                                     processPath(SIMPLIFICATION_FACTOR)
+                                    // processFullPath(1)
                                 } else {
                                     client.send('illegalMove', {})
                                 }
@@ -259,6 +278,7 @@ export class GameRoom extends Room {
                     easystar.calculate();
 
                 } else {
+                    console.log('====> Target area:', mapMatrix[loResRoundedX][loResRoundedY])
                     // TODO: find closes allowed position
                     client.send('illegalMove', {})
                 }

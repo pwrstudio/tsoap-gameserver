@@ -43,7 +43,7 @@ export function onJoin(this: Room) {
             console.log("** GOING:", this.sessionId,);
             this.send("go", { x: Math.floor(Math.random() * (4950 - 50 + 1)) + 50, y: Math.floor(Math.random() * (4950 - 50 + 1)) + 50 });
         }
-    }, 1000);
+    }, 5000);
 
     this.onMessage("*", (type, message) => {
         // console.log(this.sessionId, "received:", type, message);

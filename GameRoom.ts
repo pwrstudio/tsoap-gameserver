@@ -29,7 +29,8 @@ const mapMatrix = JSON.parse(rawdata.toString()).data;
 const easystar = new EasyStar.js();
 easystar.setGrid(mapMatrix)
 easystar.setAcceptableTiles([0, 2, 3, 4, 5]);
-easystar.setTurnPenalty(1.5);
+easystar.setTurnPenalty(1);
+easystar.setHeuristicsFactor(1);
 
 class IP extends Schema {
     @type("string") address: string;
@@ -91,6 +92,15 @@ class State extends Schema {
     @type({ map: PrivateRoom }) privateRooms = new MapSchema();
 }
 
+const calculateDirection = (diffX:Number, diffY:Number) => {
+    if (diffX === 0 && diffY === -10) return 'front'
+    else if (diffX === 10 && diffY === 0) return 'right'
+    else if (diffX === 0 && diffY === 10) return 'back'
+    else if (diffX === -10 && diffY === 0) return 'left'
+    else if (diffX === 0 && diffY === 0) return 'rest'
+    throw new Error('These differences are not valid: ' + diffX + ', ' + diffY)
+};
+
 export class GameRoom extends Room {
 
     autoDispose = false;
@@ -139,15 +149,24 @@ export class GameRoom extends Room {
 
         this.onMessage("go", (client, message) => {
             try {
-                let roundedX = clamp(Math.ceil(get(message, 'x', 0) / 10) * 10, 0, 4990)
-                let roundedY = clamp(Math.ceil(get(message, 'y', 0) / 10) * 10, 0, 4990)
+                let roundedX = clamp(Math.ceil(get(message, 'x', this.state.players[client.sessionId].x) / 10) * 10, 0, 4990)
+                let roundedY = clamp(Math.ceil(get(message, 'y', this.state.players[client.sessionId].y) / 10) * 10, 0, 4990)
                 let loResRoundedX = roundedX / 10
                 let loResRoundedY = roundedY / 10
 
-                let originX = clamp(Math.ceil(get(message, 'originX', 0) / 10) * 10, 0, 4990)
-                let originY = clamp(Math.ceil(get(message, 'originY', 0) / 10) * 10, 0, 4990)
+                let originX = clamp(Math.ceil(get(message, 'originX', this.state.players[client.sessionId].x) / 10) * 10, 0, 4990)
+                let originY = clamp(Math.ceil(get(message, 'originY', this.state.players[client.sessionId].y) / 10) * 10, 0, 4990)
                 let loResOriginX = originX / 10
                 let loResOriginY = originY / 10
+
+                let dx = Math.abs(loResOriginX - loResRoundedX);
+                let dy = Math.abs(loResOriginY - loResRoundedY);
+                let distance = dx + dy;
+                if(distance > 150) {
+                    console.error('distance too long')
+                    client.send('illegalMove', {})
+                    return;
+                }
 
                 // console.log(loResRoundedX)
                 // console.log(loResRoundedY)
@@ -158,14 +177,20 @@ export class GameRoom extends Room {
 
                 // if (mapMatrix[loResRoundedX][loResRoundedY] !== 1) {
 
+                console.time('pathfinding')
                 easystar.findPath(loResOriginX,
                     loResOriginY,
                     loResRoundedX,
                     loResRoundedY, path => {
+
+                        console.timeEnd('pathfinding')
+
                         if (path === null) {
                             console.error('no path')
                             client.send('illegalMove', {})
                         } else {
+
+                            console.time('path-processing')
 
                             let fullPath = new Path()
                             path.forEach(wp => {
@@ -192,24 +217,31 @@ export class GameRoom extends Room {
                                 let currentWaypoint = new Waypoint(fullPath.waypoints[index].x, fullPath.waypoints[index].y);
 
                                 // CALCULATE DIRECTION
-                                let delta_x = fullPath.waypoints[prevIndex].x - currentWaypoint.x;
-                                let delta_y = currentWaypoint.y - fullPath.waypoints[prevIndex].y;
-                                let theta_degrees = Math.atan2(delta_y, delta_x) * (180 / Math.PI);
-                                // console.log(theta_degrees)
-                                // DIRECTIONS =>
-                                // -90 === Back
-                                //  90 === Front
-                                // 180 === Rights
-                                //   0 === Left
-                                if (inRange(theta_degrees, -80, -181)) {
-                                    currentWaypoint.direction = 'back';
-                                } else if (inRange(theta_degrees, 10, 170)) {
-                                    currentWaypoint.direction = 'front';
-                                } else if (inRange(theta_degrees, 170, 190)) {
-                                    currentWaypoint.direction = 'right';
-                                } else if (inRange(theta_degrees, -10, 10)) {
-                                    currentWaypoint.direction = 'left';
-                                }
+                                // let delta_x = fullPath.waypoints[prevIndex].x - currentWaypoint.x;
+                                // let delta_y = currentWaypoint.y - fullPath.waypoints[prevIndex].y;
+                                // let theta_degrees = Math.atan2(delta_y, delta_x) * (180 / Math.PI);
+                                // // console.log(theta_degrees)
+                                // // DIRECTIONS =>
+                                // // -90 === Back
+                                // //  90 === Front
+                                // // 180 === Rights
+                                // //   0 === Left
+                                // if (inRange(theta_degrees, -80, -181)) {
+                                //     currentWaypoint.direction = 'back';
+                                // } else if (inRange(theta_degrees, 10, 170)) {
+                                //     currentWaypoint.direction = 'front';
+                                // } else if (inRange(theta_degrees, 170, 190)) {
+                                //     currentWaypoint.direction = 'right';
+                                // } else if (inRange(theta_degrees, -10, 10)) {
+                                //     currentWaypoint.direction = 'left';
+                                // }
+
+                                let delta_x = currentWaypoint.x - fullPath.waypoints[prevIndex].x;
+                                let delta_y = fullPath.waypoints[prevIndex].y - currentWaypoint.y;
+
+                                currentWaypoint.direction = calculateDirection(delta_x, delta_y)
+
+                                // console.log(currentWaypoint.x, currentWaypoint.y, currentWaypoint.direction)
 
                                 // CALCULATE STEPS
                                 // if (currentWaypoint.direction == "back" || currentWaypoint.direction == "front") {
@@ -228,6 +260,9 @@ export class GameRoom extends Room {
                                 finalPath.waypoints.push(currentWaypoint);
 
                                 if (index == (fullPath.waypoints.length - 1)) {
+
+                                    // console.log('-----') 
+
                                     let extendedPath = new Path()
                                     for (let i = 0; i < finalPath.waypoints.length - 1; i++) {
                                         extendedPath.waypoints.push(finalPath.waypoints[i])
@@ -245,6 +280,9 @@ export class GameRoom extends Room {
                                             extendedPath.waypoints.push(tempPoint)
                                         }
                                     }
+
+                                    console.timeEnd('path-processing')
+
 
                                     this.state.players[client.sessionId].x = currentWaypoint.x;
                                     this.state.players[client.sessionId].y = currentWaypoint.y;

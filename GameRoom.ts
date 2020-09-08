@@ -56,7 +56,7 @@ class Waypoint extends Schema {
     @type("number") steps: number;
     @type("string") direction: string;
 
-    constructor (x:number, y:number, direction?:string, steps?:number) {
+    constructor(x: number, y: number, direction?: string, steps?: number) {
         super({});
 
         this.x = x
@@ -190,13 +190,79 @@ export class GameRoom extends Room {
                                 // console.log('FIRST PATH X:', fullPath.waypoints[0].x)
                                 // console.log('FIRST PATH Y:', fullPath.waypoints[0].y)
 
+                                const compressPath = (path: Path) => {
+
+                                    // nothing to compress
+                                    if (path.waypoints.length < 3) {
+                                        return path;
+                                    }
+
+                                    let compressed = new Path();
+                                    let sx = path.waypoints[0].x // start x
+                                    let sy = path.waypoints[0].y // start y
+                                    let px = path.waypoints[1].x  // second point x
+                                    let py = path.waypoints[1].y  // second point y
+                                    let dx = px - sx // direction between the two points
+                                    let dy = py - sy // direction between the two points
+                                    let lx
+                                    let ly
+                                    let ldx
+                                    let ldy
+                                    let sq
+
+                                    // normalize the direction
+                                    sq = Math.sqrt(dx * dx + dy * dy);
+                                    dx /= sq;
+                                    dy /= sq;
+
+                                    // start the new path
+                                    compressed.waypoints.push(path.waypoints[0]);
+
+                                    for (let i = 2; i < path.waypoints.length; i++) {
+
+                                        // store the last point
+                                        lx = px;
+                                        ly = py;
+
+                                        // store the last direction
+                                        ldx = dx;
+                                        ldy = dy;
+
+                                        // next point
+                                        px = path.waypoints[i].x
+                                        py = path.waypoints[i].y
+
+                                        // next direction
+                                        dx = px - lx;
+                                        dy = py - ly;
+
+                                        // normalize
+                                        sq = Math.sqrt(dx * dx + dy * dy);
+                                        dx /= sq;
+                                        dy /= sq;
+
+                                        // if the direction has changed, store the point
+                                        if (dx !== ldx || dy !== ldy) {
+                                            compressed.waypoints.push(path.waypoints[i]);
+                                        }
+                                    }
+
+                                    // store the last point
+                                    compressed.waypoints.push(path.waypoints[path.waypoints.length - 1]);
+
+                                    console.dir(compressed)
+
+                                    return compressed;
+
+                                }
+
                                 const processPath = (index = 0) => {
-                                    const nextIndex = index + SIMPLIFICATION_FACTOR >= (fullPath.waypoints.length - 1) 
-                                                        ? fullPath.waypoints.length - 1 
-                                                        : index + SIMPLIFICATION_FACTOR
-                                    const prevIndex = index == 0 
-                                                        ? 0 
-                                                        : index - SIMPLIFICATION_FACTOR
+                                    const nextIndex = index + SIMPLIFICATION_FACTOR >= (fullPath.waypoints.length - 1)
+                                        ? fullPath.waypoints.length - 1
+                                        : index + SIMPLIFICATION_FACTOR
+                                    const prevIndex = index == 0
+                                        ? 0
+                                        : index - SIMPLIFICATION_FACTOR
                                     console.log('length', fullPath.waypoints.length - 1)
                                     console.log('index', index)
                                     console.log('next index', nextIndex)
@@ -253,9 +319,11 @@ export class GameRoom extends Room {
                                     console.log("–– Direction:", currentWaypoint.direction);
                                     console.log("–– Steps:", currentWaypoint.steps);
                                     console.log("= = = = =");
+
                                     finalPath.waypoints.push(currentWaypoint);
 
                                     if (index == (fullPath.waypoints.length - 1)) {
+                                        // let compPath = compressPath(finalPath)
                                         this.state.players[client.sessionId].x = currentWaypoint.x;
                                         this.state.players[client.sessionId].y = currentWaypoint.y;
                                         this.state.players[client.sessionId].path = finalPath;
@@ -265,7 +333,7 @@ export class GameRoom extends Room {
                                         processPath(nextIndex)
                                     }
                                 }
-                                
+
                                 if (fullPath.waypoints.length > 0) {
                                     processPath(SIMPLIFICATION_FACTOR)
                                     // processFullPath(1)
@@ -274,7 +342,7 @@ export class GameRoom extends Room {
                                 }
                             }
                         });
-    
+
                     easystar.calculate();
 
                 } else {

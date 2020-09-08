@@ -41,7 +41,10 @@ export function onJoin(this: Room) {
     setInterval(() => {
         if (Math.floor(Math.random() * (20 - 1 + 1)) + 1 == 5) {
             console.log("** GOING:", this.sessionId,);
-            this.send("go", { x: Math.floor(Math.random() * (4950 - 50 + 1)) + 50, y: Math.floor(Math.random() * (4950 - 50 + 1)) + 50 });
+            let targetX = Math.floor(Math.random() * (4950 - 50 + 1)) + 50
+            let targetY = Math.floor(Math.random() * (4950 - 50 + 1)) + 50
+
+            this.send("go", { x: targetX, y: targetY, });
         }
     }, 1000);
 

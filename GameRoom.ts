@@ -15,7 +15,8 @@ const MAX_STACK_HEIGHT = 200;
 const MAX_USERNAME_LENGTH = 100;
 const MAX_CHATMESSAGE_LENGTH = 1000;
 
-const rawdata = fs.readFileSync('hkw-map-color-hard.json');
+// const rawdata = fs.readFileSync('hkw-map-color-hard.json');
+const rawdata = fs.readFileSync('new-test-color-2.json');
 const mapMatrix = JSON.parse(rawdata.toString()).data;
 
 // TILE TYPES =>
@@ -282,12 +283,12 @@ export class GameRoom extends Room {
                                     }
 
                                     console.timeEnd('path-processing')
-
-
                                     this.state.players[client.sessionId].x = currentWaypoint.x;
                                     this.state.players[client.sessionId].y = currentWaypoint.y;
                                     this.state.players[client.sessionId].path = extendedPath;
                                     this.state.players[client.sessionId].fullPath = fullPath;
+                                    this.state.players[client.sessionId].area = mapMatrix[loResRoundedY][loResRoundedX]
+
                                     return
                                 } else {
                                     processPath(nextIndex)
@@ -338,8 +339,8 @@ export class GameRoom extends Room {
                 console.log(colorIndex)
 
                 while (true) {
-                    newX = Math.ceil((Math.floor(Math.random() * (4950 - 50 + 1)) + 50) / 10) * 10;
-                    newY = Math.ceil((Math.floor(Math.random() * (4950 - 50 + 1)) + 50) / 10) * 10;
+                    newX = Math.ceil((Math.floor(Math.random() * (3950 - 50 + 1)) + 50) / 10) * 10;
+                    newY = Math.ceil((Math.floor(Math.random() * (3950 - 50 + 1)) + 50) / 10) * 10;
                     if (mapMatrix[newY / 10][newX / 10] == colorIndex) break;
                 }
 
@@ -456,8 +457,8 @@ export class GameRoom extends Room {
                 let startY = 0;
 
                 while (true) {
-                    startX = Math.ceil((Math.floor(Math.random() * (4950 - 50 + 1)) + 50) / 10) * 10;
-                    startY = Math.ceil((Math.floor(Math.random() * (4950 - 50 + 1)) + 50) / 10) * 10;
+                    startX = Math.ceil((Math.floor(Math.random() * (3950 - 50 + 1)) + 50) / 10) * 10;
+                    startY = Math.ceil((Math.floor(Math.random() * (3950 - 50 + 1)) + 50) / 10) * 10;
                     // Spawn all in green area
                     if (mapMatrix[startY / 10][startX / 10] == 4) break;
                 }

@@ -30,7 +30,7 @@
     "chance": "^1.1.6",
     "colyseus": "^0.13.0",
     "cors": "^2.8.5",
-    "easystarjs": "^0.4.3",
+    "easystarjs": "pwrstudio/easystarjs",
     "express": "^4.16.4",
     "express-jwt": "^6.0.0",
     "lodash": "^4.17.19",

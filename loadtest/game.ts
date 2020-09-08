@@ -46,7 +46,7 @@ export function onJoin(this: Room) {
 
             this.send("go", { x: targetX, y: targetY, });
         }
-    }, 1000);
+    }, 5000);
 
     this.onMessage("*", (type, message) => {
         // console.log(this.sessionId, "received:", type, message);

@@ -29,8 +29,8 @@ const mapMatrix = JSON.parse(rawdata.toString()).data;
 const easystar = new EasyStar.js();
 easystar.setGrid(mapMatrix)
 easystar.setAcceptableTiles([0, 2, 3, 4, 5]);
-easystar.setTurnPenalty(1);
-easystar.setHeuristicsFactor(1);
+easystar.setTurnPenalty(2);
+easystar.setHeuristicsFactor(2);
 
 class IP extends Schema {
     @type("string") address: string;

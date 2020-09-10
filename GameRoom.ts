@@ -9,14 +9,18 @@ import get from 'lodash/get'
 import clamp from 'lodash/clamp'
 import isNumber from 'lodash/isNumber'
 import * as Sentry from '@sentry/node';
+import { argv } from 'yargs'
 
 const SSO_SECRET = "daymoon";
 const MAX_STACK_HEIGHT = 200;
 const MAX_USERNAME_LENGTH = 100;
 const MAX_CHATMESSAGE_LENGTH = 1000;
 
+console.dir(argv)
+let gridPath = (argv.grid as string)
+console.log(gridPath)
 // const rawdata = fs.readFileSync('hkw-map-color-hard.json');
-const rawdata = fs.readFileSync('new-test-color-2.json');
+const rawdata = fs.readFileSync(gridPath);
 const mapMatrix = JSON.parse(rawdata.toString()).data;
 
 // TILE TYPES =>

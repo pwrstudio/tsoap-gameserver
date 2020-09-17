@@ -5,18 +5,23 @@ import crypto from "crypto"
 import querystring from "querystring"
 import fs from "fs"
 import get from "lodash/get"
+import sample from "lodash/sample"
 // import inRange from 'lodash/inRange'
 import clamp from "lodash/clamp"
 import isNumber from "lodash/isNumber"
 import * as Sentry from "@sentry/node"
+import { colors, adjectives } from "unique-names-generator"
 
 const SSO_SECRET = "daymoon"
 const MAX_STACK_HEIGHT = 200
 const MAX_USERNAME_LENGTH = 100
 const MAX_CHATMESSAGE_LENGTH = 1000
 
-const rawdata = fs.readFileSync("hkw-map-color-hard.json")
-// const rawdata = fs.readFileSync(gridPath);
+const RANDOM_WORDS = [...colors]
+
+console.dir(RANDOM_WORDS)
+
+const rawdata = fs.readFileSync("grid.json")
 const mapMatrix = JSON.parse(rawdata.toString()).data
 
 // TILE TYPES =>
@@ -63,7 +68,7 @@ class Player extends Schema {
   @type("string") name: string
   @type("string") tint: string
   @type("string") ip: string
-  @type("number") avatar: number
+  @type("string") avatar: string
   @type("boolean") connected: boolean
   @type("number") x: number
   @type("number") y: number
@@ -511,6 +516,16 @@ export class GameRoom extends Room {
           if (mapMatrix[startY / 10][startX / 10] == 4) break
         }
 
+        let randomAdjective = sample(RANDOM_WORDS)
+        randomAdjective =
+          randomAdjective.charAt(0).toUpperCase() + randomAdjective.slice(1)
+        const userName =
+          (!get(options, "authenticated", false) ? randomAdjective + " " : "") +
+          get(options, "name", "Undefined name").substring(
+            0,
+            MAX_USERNAME_LENGTH
+          )
+
         this.state.players[client.sessionId] = new Player()
         this.state.players[client.sessionId].authenticated =
           options.authenticated || false
@@ -519,18 +534,18 @@ export class GameRoom extends Room {
           "tint",
           "0XFF0000"
         )
-        this.state.players[client.sessionId].name = get(
-          options,
-          "name",
-          "Undefined name"
-        ).substring(0, MAX_USERNAME_LENGTH)
+        this.state.players[client.sessionId].name = userName
         this.state.players[client.sessionId].uuid = get(
           options,
           "uuid",
           "no-uuid"
         )
         this.state.players[client.sessionId].ip = get(options, "ip", "6.6.6.6")
-        this.state.players[client.sessionId].avatar = get(options, "avatar", 1)
+        this.state.players[client.sessionId].avatar = get(
+          options,
+          "avatar",
+          "Undefined avatar id"
+        )
         this.state.players[client.sessionId].connected = true
         this.state.players[client.sessionId].x = startX
         this.state.players[client.sessionId].y = startY

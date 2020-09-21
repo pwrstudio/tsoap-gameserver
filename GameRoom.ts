@@ -11,11 +11,13 @@ import clamp from "lodash/clamp"
 import isNumber from "lodash/isNumber"
 import * as Sentry from "@sentry/node"
 import { colors, adjectives } from "unique-names-generator"
+import mongoose from "mongoose"
 
 const SSO_SECRET = "daymoon"
 const MAX_STACK_HEIGHT = 200
 const MAX_USERNAME_LENGTH = 100
 const MAX_CHATMESSAGE_LENGTH = 1000
+const MONGODB_URI = "mongodb://localhost:27017/details"
 
 const RANDOM_WORDS = [...colors]
 
@@ -23,6 +25,43 @@ console.dir(RANDOM_WORDS)
 
 const rawdata = fs.readFileSync("grid.json")
 const mapMatrix = JSON.parse(rawdata.toString()).data
+
+mongoose.connect(MONGODB_URI, {
+  useUnifiedTopology: true,
+  useNewUrlParser: true,
+})
+
+const connection = mongoose.connection
+const MongoSchema = mongoose.Schema
+const message = new MongoSchema(
+  {
+    text: {
+      type: String,
+    },
+    uuid: {
+      type: String,
+    },
+    name: {
+      type: String,
+    },
+    msgId: {
+      type: String,
+    },
+    tint: {
+      type: String,
+    },
+    timestamp: {
+      type: Number,
+    },
+  },
+  { collection: "Messages" }
+)
+
+const MongoMessage = mongoose.model("Message", message)
+
+connection.once("open", () => {
+  console.log("MongoDB database connection established successfully")
+})
 
 // TILE TYPES =>
 // 0 = white
@@ -419,6 +458,13 @@ export class GameRoom extends Room {
           newMessage.tint = get(payload, "tint", "No tint")
           newMessage.timestamp = Date.now()
           this.state.messages.push(newMessage)
+          // Write to DB
+          let messageToMongo = new MongoMessage(newMessage)
+          messageToMongo.save((err) => {
+            if (err) {
+              console.error(err)
+            }
+          })
         }
       } catch (err) {
         console.log(err)

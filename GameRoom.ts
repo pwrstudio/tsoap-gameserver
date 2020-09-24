@@ -6,62 +6,62 @@ import querystring from "querystring"
 import fs from "fs"
 import get from "lodash/get"
 import sample from "lodash/sample"
-// import inRange from 'lodash/inRange'
 import clamp from "lodash/clamp"
 import isNumber from "lodash/isNumber"
 import * as Sentry from "@sentry/node"
-import { colors, adjectives } from "unique-names-generator"
+import { colors } from "unique-names-generator"
 import mongoose from "mongoose"
+import { v4 as uuidv4 } from "uuid"
 
 const SSO_SECRET = "daymoon"
 const MAX_STACK_HEIGHT = 200
 const MAX_USERNAME_LENGTH = 100
 const MAX_CHATMESSAGE_LENGTH = 1000
 const MONGODB_URI = "mongodb://localhost:27017/details"
-
 const RANDOM_WORDS = [...colors]
-
-console.dir(RANDOM_WORDS)
 
 const rawdata = fs.readFileSync("grid.json")
 const mapMatrix = JSON.parse(rawdata.toString()).data
 
-mongoose.connect(MONGODB_URI, {
-  useUnifiedTopology: true,
-  useNewUrlParser: true,
-})
+// mongoose.connect(MONGODB_URI, {
+//   useUnifiedTopology: true,
+//   useNewUrlParser: true,
+// })
 
-const connection = mongoose.connection
-const MongoSchema = mongoose.Schema
-const message = new MongoSchema(
-  {
-    text: {
-      type: String,
-    },
-    uuid: {
-      type: String,
-    },
-    name: {
-      type: String,
-    },
-    msgId: {
-      type: String,
-    },
-    tint: {
-      type: String,
-    },
-    timestamp: {
-      type: Number,
-    },
-  },
-  { collection: "Messages" }
-)
+// const connection = mongoose.connection
+// const MongoSchema = mongoose.Schema
+// const message = new MongoSchema(
+//   {
+//     text: {
+//       type: String,
+//     },
+//     uuid: {
+//       type: String,
+//     },
+//     name: {
+//       type: String,
+//     },
+//     msgId: {
+//       type: String,
+//     },
+//     tint: {
+//       type: String,
+//     },
+//     timestamp: {
+//       type: Number,
+//     },
+//     area: {
+//       type: Number,
+//     },
+//   },
+//   { collection: "Messages" }
+// )
 
-const MongoMessage = mongoose.model("Message", message)
+// const MongoMessage = mongoose.model("Message", message)
 
-connection.once("open", () => {
-  console.log("MongoDB database connection established successfully")
-})
+// connection.once("open", () => {
+//   console.log("MongoDB database connection established successfully")
+// })
 
 // TILE TYPES =>
 // 0 = white
@@ -84,16 +84,16 @@ class IP extends Schema {
 class Waypoint extends Schema {
   @type("number") x: number
   @type("number") y: number
-  @type("number") steps: number
+  @type("number") area: number
   @type("string") direction: string
 
-  constructor(x: number, y: number, direction?: string, steps?: number) {
+  constructor(x: number, y: number, area?: number, direction?: string) {
     super({})
 
     this.x = x
     this.y = y
+    this.area = area
     this.direction = direction
-    this.steps = steps
   }
 }
 
@@ -113,8 +113,19 @@ class Player extends Schema {
   @type("number") y: number
   @type("number") area: number
   @type("boolean") authenticated: boolean
+  @type("string") carrying: string
   @type(Path) path: Path = new Path()
   @type(Path) fullPath: Path = new Path()
+}
+
+class CaseStudy extends Schema {
+  @type("string") uuid: string
+  @type("string") name: string
+  @type("number") tint: number
+  @type("number") age: number
+  @type("number") x: number
+  @type("number") y: number
+  @type("string") carriedBy: string
 }
 
 class Message extends Schema {
@@ -124,17 +135,14 @@ class Message extends Schema {
   @type("string") text: string
   @type("string") tint: string
   @type("number") timestamp: number
-}
-
-class PrivateRoom extends Schema {
-  @type(["string"]) clients = new ArraySchema<"string">()
+  @type("number") area: number
 }
 
 class State extends Schema {
   @type([IP]) blacklist = new ArraySchema<IP>()
   @type({ map: Player }) players = new MapSchema()
+  @type({ map: CaseStudy }) caseStudies = new MapSchema()
   @type([Message]) messages = new ArraySchema<Message>()
-  @type({ map: PrivateRoom }) privateRooms = new MapSchema()
 }
 
 const calculateDirection = (diffX: Number, diffY: Number) => {
@@ -153,6 +161,24 @@ export class GameRoom extends Room {
 
   onCreate(options: any) {
     this.setState(new State())
+
+    // Place case studies
+    for (let i = 0; i < 50; i++) {
+      let id = uuidv4()
+      this.state.caseStudies[id] = new CaseStudy()
+      this.state.caseStudies[id].uuid = id
+      this.state.caseStudies[id].name =
+        sample(RANDOM_WORDS) + " " + sample(RANDOM_WORDS)
+      this.state.caseStudies[id].age = 20
+      this.state.caseStudies[id].carriedBy = ""
+      this.state.caseStudies[id].tint = (Math.random() * 0xffffff) << 0
+      this.state.caseStudies[id].x =
+        Math.ceil((Math.floor(Math.random() * (2400 - 1600 + 1)) + 1600) / 10) *
+        10
+      this.state.caseStudies[id].y =
+        Math.ceil((Math.floor(Math.random() * (2000 - 1600 + 1)) + 1600) / 10) *
+        10
+    }
 
     this.onMessage("blacklist", (client, payload) => {
       try {
@@ -239,15 +265,6 @@ export class GameRoom extends Room {
           return
         }
 
-        // console.log(loResRoundedX)
-        // console.log(loResRoundedY)
-        // console.log('- - - -')
-        // console.log(loResOriginX)
-        // console.log(loResOriginY)
-        // console.log('- - - -')
-
-        // if (mapMatrix[loResRoundedX][loResRoundedY] !== 1) {
-
         console.time("pathfinding")
         easystar.findPath(
           loResOriginX,
@@ -266,10 +283,9 @@ export class GameRoom extends Room {
               let fullPath = new Path()
               path.forEach((wp) => {
                 fullPath.waypoints.push(
-                  new Waypoint(wp.x * 10, wp.y * 10, "", 10)
+                  new Waypoint(wp.x * 10, wp.y * 10, mapMatrix[wp.y][wp.x])
                 )
               })
-              // console.dir(fullPath)
 
               const SIMPLIFICATION_FACTOR = 1
               let finalPath = new Path()
@@ -280,65 +296,22 @@ export class GameRoom extends Room {
                     ? fullPath.waypoints.length - 1
                     : index + SIMPLIFICATION_FACTOR
                 const prevIndex = index == 0 ? 0 : index - SIMPLIFICATION_FACTOR
-                // console.log('length', fullPath.waypoints.length - 1)
-                // console.log('index', index)
-                // console.log('next index', nextIndex)
-                // console.log('prev index', prevIndex)
-                // console.log('=======')
 
                 let currentWaypoint = new Waypoint(
                   fullPath.waypoints[index].x,
-                  fullPath.waypoints[index].y
+                  fullPath.waypoints[index].y,
+                  fullPath.waypoints[index].area
                 )
 
-                // CALCULATE DIRECTION
-                // let delta_x = fullPath.waypoints[prevIndex].x - currentWaypoint.x;
-                // let delta_y = currentWaypoint.y - fullPath.waypoints[prevIndex].y;
-                // let theta_degrees = Math.atan2(delta_y, delta_x) * (180 / Math.PI);
-                // // console.log(theta_degrees)
-                // // DIRECTIONS =>
-                // // -90 === Back
-                // //  90 === Front
-                // // 180 === Rights
-                // //   0 === Left
-                // if (inRange(theta_degrees, -80, -181)) {
-                //     currentWaypoint.direction = 'back';
-                // } else if (inRange(theta_degrees, 10, 170)) {
-                //     currentWaypoint.direction = 'front';
-                // } else if (inRange(theta_degrees, 170, 190)) {
-                //     currentWaypoint.direction = 'right';
-                // } else if (inRange(theta_degrees, -10, 10)) {
-                //     currentWaypoint.direction = 'left';
-                // }
-
-                let delta_x =
+                const delta_x =
                   currentWaypoint.x - fullPath.waypoints[prevIndex].x
-                let delta_y =
+                const delta_y =
                   fullPath.waypoints[prevIndex].y - currentWaypoint.y
-
                 currentWaypoint.direction = calculateDirection(delta_x, delta_y)
 
-                // console.log(currentWaypoint.x, currentWaypoint.y, currentWaypoint.direction)
-
-                // CALCULATE STEPS
-                // if (currentWaypoint.direction == "back" || currentWaypoint.direction == "front") {
-                //     currentWaypoint.steps = Math.abs(currentWaypoint.y - fullPath.waypoints[prevIndex].y)
-                // } else if (currentWaypoint.direction == "left" || currentWaypoint.direction == "right") {
-                //     currentWaypoint.steps = Math.abs(currentWaypoint.x - fullPath.waypoints[prevIndex].x)
-                // }
-
-                // !!!! TODO calculate current AREA
-                // console.log("=> ADDING WAYPOINT:", index);
-                // console.log("–– X:", currentWaypoint.x);
-                // console.log("–– Y:", currentWaypoint.y);
-                // console.log("–– Direction:", currentWaypoint.direction);
-                // console.log("–– Steps:", currentWaypoint.steps);
-                // console.log("= = = = =");
                 finalPath.waypoints.push(currentWaypoint)
 
                 if (index == fullPath.waypoints.length - 1) {
-                  // console.log('-----')
-
                   let extendedPath = new Path()
                   for (let i = 0; i < finalPath.waypoints.length - 1; i++) {
                     extendedPath.waypoints.push(finalPath.waypoints[i])
@@ -346,8 +319,8 @@ export class GameRoom extends Room {
                       let tempPoint = new Waypoint(
                         finalPath.waypoints[i].x,
                         finalPath.waypoints[i].y,
-                        finalPath.waypoints[i + 1].direction,
-                        finalPath.waypoints[i + 1].steps
+                        finalPath.waypoints[i].area,
+                        finalPath.waypoints[i + 1].direction
                       )
                       if (finalPath.waypoints[i + 1].direction == "back") {
                         tempPoint.y = tempPoint.y - 2 * x
@@ -373,8 +346,6 @@ export class GameRoom extends Room {
                   this.state.players[client.sessionId].y = currentWaypoint.y
                   this.state.players[client.sessionId].path = extendedPath
                   this.state.players[client.sessionId].fullPath = fullPath
-                  this.state.players[client.sessionId].area =
-                    mapMatrix[loResRoundedY][loResRoundedX]
 
                   return
                 } else {
@@ -393,12 +364,6 @@ export class GameRoom extends Room {
         )
 
         easystar.calculate()
-
-        // } else {
-        //     console.log('====> Target area:', mapMatrix[loResRoundedX][loResRoundedY])
-        //     // TODO: find closes allowed position
-        //     client.send('illegalMove', {})
-        // }
       } catch (err) {
         console.log(err)
         Sentry.captureException(err)
@@ -456,15 +421,16 @@ export class GameRoom extends Room {
           newMessage.name = get(payload, "name", "No name")
           newMessage.uuid = get(payload, "uuid", "No UUID")
           newMessage.tint = get(payload, "tint", "No tint")
+          newMessage.area = get(payload, "area", 4)
           newMessage.timestamp = Date.now()
           this.state.messages.push(newMessage)
           // Write to DB
-          let messageToMongo = new MongoMessage(newMessage)
-          messageToMongo.save((err) => {
-            if (err) {
-              console.error(err)
-            }
-          })
+          // let messageToMongo = new MongoMessage(newMessage)
+          // messageToMongo.save((err) => {
+          //   if (err) {
+          //     console.error(err)
+          //   }
+          // })
         }
       } catch (err) {
         console.log(err)
@@ -486,23 +452,35 @@ export class GameRoom extends Room {
       }
     })
 
-    // createPrivateRoom
-    this.onMessage("createPrivateRoom", (client, payload) => {
-      console.log(payload.roomId)
-      this.state.privateRooms[payload.roomId] = new PrivateRoom()
-      this.state.privateRooms[payload.roomId].clients.push(client.sessionId)
-      this.state.privateRooms[payload.roomId].clients.push(payload.partner)
-      console.dir(this.state.privateRooms)
+    this.onMessage("pickUpCaseStudy", (client, payload) => {
+      try {
+        console.dir(payload.uuid)
+        console.dir(client.sessionId)
+        this.state.caseStudies[payload.uuid].carriedBy = client.sessionId
+        this.state.players[client.sessionId].carrying = payload.uuid
+      } catch (err) {
+        console.log(err)
+        Sentry.captureException(err)
+      }
     })
 
-    // leavePrivateRoom
-    this.onMessage("leavePrivateRoom", (client, payload) => {
-      console.log(payload.roomId)
-      delete this.state.privateRooms[payload.roomId]
-      console.dir(this.state.privateRooms)
+    this.onMessage("dropCaseStudy", (client, payload) => {
+      try {
+        console.dir(payload.uuid)
+        console.dir(client.sessionId)
+        this.state.caseStudies[payload.uuid].x = this.state.players[
+          client.sessionId
+        ].x
+        this.state.caseStudies[payload.uuid].y = this.state.players[
+          client.sessionId
+        ].y
+        this.state.caseStudies[payload.uuid].carriedBy = ""
+        this.state.players[client.sessionId].carrying = ""
+      } catch (err) {
+        console.log(err)
+        Sentry.captureException(err)
+      }
     })
-
-    // joinPrivateRoom
   }
 
   onAuth(client: Client, options: any, request: any) {

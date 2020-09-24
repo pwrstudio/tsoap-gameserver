@@ -8,7 +8,6 @@ import { monitor } from "@colyseus/monitor"
 // Sentry.init({ dsn: 'https://7cb5d18a944d4a0cb8a9c4ddd6fa1d9d@o433904.ingest.sentry.io/5390092' });
 
 import { GameRoom } from "./GameRoom"
-import { ChatRoom } from "./ChatRoom"
 
 const port = Number(process.env.PORT || 2567)
 const app = express()
@@ -23,7 +22,6 @@ const gameServer = new Server({
 
 // register your room handlers
 gameServer.define("game", GameRoom)
-gameServer.define("chat", ChatRoom)
 
 // register colyseus monitor AFTER registering your room handlers
 app.use("/colyseus", monitor())

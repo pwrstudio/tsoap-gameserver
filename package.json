@@ -9,7 +9,7 @@
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "author": "",
-  "license": "UNLICENSED",
+  "license": "MIT",
   "bugs": {
     "url": "https://github.com/colyseus/create-colyseus/issues"
   },
@@ -26,12 +26,13 @@
     "@sentry/node": "5.20.1",
     "@types/lodash": "^4.14.158",
     "@types/mongoose": "^5.7.36",
-    "colyseus": "^0.13.0",
+    "@types/uuid": "^8.3.0",
+    "colyseus": "^0.13.7",
     "cors": "^2.8.5",
     "easystarjs": "pwrstudio/easystarjs",
     "express": "^4.16.4",
     "express-jwt": "^6.0.0",
-    "lodash": "^4.17.19",
+    "lodash": "^4.17.20",
     "mongoose": "^5.10.6",
     "unique-names-generator": "^4.3.0",
     "uuid": "^8.3.0"

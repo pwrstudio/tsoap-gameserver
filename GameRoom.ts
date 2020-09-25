@@ -83,7 +83,7 @@ const easystar = new EasyStar.js()
 easystar.setGrid(mapMatrix)
 easystar.setAcceptableTiles([0, 2, 3, 4, 5])
 easystar.setTurnPenalty(2)
-easystar.setHeuristicsFactor(2)
+easystar.setHeuristicsFactor(3)
 
 class IP extends Schema {
   @type("string") address: string
@@ -181,25 +181,33 @@ export class GameRoom extends Room {
       .then((posts) => {
         console.dir(posts)
         // Place case studies
-        for (let i = 0; i < 50; i++) {
+        const createCaseStudy = () => {
+          console.log("–– CREATING ONE CASE STUDY")
           let id = uuidv4()
           let randomCaseStudy = sample(posts)
           this.state.caseStudies[id] = new CaseStudy()
           this.state.caseStudies[id].uuid = id
           this.state.caseStudies[id].name = randomCaseStudy.title
           this.state.caseStudies[id].caseStudyId = randomCaseStudy._id
-          this.state.caseStudies[id].age = 20
+          this.state.caseStudies[id].age = 10
           this.state.caseStudies[id].carriedBy = ""
           this.state.caseStudies[id].tint = (Math.random() * 0xffffff) << 0
           this.state.caseStudies[id].x =
             Math.ceil(
-              (Math.floor(Math.random() * (2400 - 1600 + 1)) + 1600) / 10
+              (Math.floor(Math.random() * (2500 - 1500 + 1)) + 1500) / 10
             ) * 10
           this.state.caseStudies[id].y =
             Math.ceil(
-              (Math.floor(Math.random() * (2000 - 1600 + 1)) + 1600) / 10
+              (Math.floor(Math.random() * (2200 - 1600 + 1)) + 1500) / 10
             ) * 10
         }
+
+        for (let i = 0; i < 50; i++) {
+          createCaseStudy()
+        }
+
+        // Drop every minute
+        setInterval(createCaseStudy, 20000)
       })
 
     this.onMessage("blacklist", (client, payload) => {
@@ -243,6 +251,8 @@ export class GameRoom extends Room {
     })
 
     this.onMessage("go", (client, message) => {
+      console.log("X", message.x)
+      console.log("Y", message.y)
       try {
         let roundedX = clamp(
           Math.ceil(
@@ -476,9 +486,9 @@ export class GameRoom extends Room {
 
     this.onMessage("pickUpCaseStudy", (client, payload) => {
       try {
-        console.dir(payload.uuid)
-        console.dir(client.sessionId)
+        console.log("AGE", this.state.caseStudies[payload.uuid].age)
         this.state.caseStudies[payload.uuid].carriedBy = client.sessionId
+        this.state.caseStudies[payload.uuid].age -= 1
         this.state.players[client.sessionId].carrying = payload.uuid
       } catch (err) {
         console.log(err)
@@ -490,12 +500,16 @@ export class GameRoom extends Room {
       try {
         console.dir(payload.uuid)
         console.dir(client.sessionId)
-        this.state.caseStudies[payload.uuid].x =
-          this.state.players[client.sessionId].x + getRandomInt(-40, 40)
-        this.state.caseStudies[payload.uuid].y =
-          this.state.players[client.sessionId].y + getRandomInt(-40, 40)
-        this.state.caseStudies[payload.uuid].carriedBy = ""
         this.state.players[client.sessionId].carrying = ""
+        if (this.state.caseStudies[payload.uuid].age == 0) {
+          delete this.state.caseStudies[payload.uuid]
+        } else {
+          this.state.caseStudies[payload.uuid].x =
+            this.state.players[client.sessionId].x + getRandomInt(-40, 40)
+          this.state.caseStudies[payload.uuid].y =
+            this.state.players[client.sessionId].y + getRandomInt(-40, 40)
+          this.state.caseStudies[payload.uuid].carriedBy = ""
+        }
       } catch (err) {
         console.log(err)
         Sentry.captureException(err)

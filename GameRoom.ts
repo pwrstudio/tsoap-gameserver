@@ -20,7 +20,7 @@ const client = sanity({
   useCdn: false,
 })
 
-const SSO_SECRET = process.env.SSO_SECRET | ""
+const SSO_SECRET = process.env.SSO_SECRET || ""
 const MAX_STACK_HEIGHT = 200
 const MAX_USERNAME_LENGTH = 100
 const MAX_CHATMESSAGE_LENGTH = 1000

@@ -111,6 +111,7 @@ class Path extends Schema {
 
 class Player extends Schema {
   @type("boolean") moderator: boolean
+  @type("boolean") npc: boolean
   @type("string") uuid: string
   @type("string") name: string
   @type("string") tint: string
@@ -572,6 +573,7 @@ export class GameRoom extends Room {
         this.state.players[client.sessionId] = new Player()
         this.state.players[client.sessionId].authenticated =
           options.authenticated || false
+        this.state.players[client.sessionId].npc = options.npc || false
         this.state.players[client.sessionId].tint = get(
           options,
           "tint",

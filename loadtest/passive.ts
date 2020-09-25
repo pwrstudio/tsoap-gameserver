@@ -37,7 +37,7 @@ export function requestJoinOptions(this: Client, i: number) {
     name: randomName,
     uuid: uuidv4(),
     tint: getRandomColor(),
-    avatar: getRandomInt(0, 2),
+    avatar: "63e17a05-9617-4abd-a4c6-d2820496c42d",
   }
 }
 

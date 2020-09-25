@@ -12,6 +12,15 @@ import * as Sentry from "@sentry/node"
 import { colors } from "unique-names-generator"
 import mongoose from "mongoose"
 import { v4 as uuidv4 } from "uuid"
+import sanity from "@sanity/client"
+
+const client = sanity({
+  projectId: "bu5rnal5",
+  dataset: "production",
+  // token:
+  //   "skXhQX58sotVgMSmaKjxbCO95r9A1NWAMLsePFclGzYjyPr8RadgiBcTKX5dniLh0GzTlBGDQxVAX8sjgyz7y7FYPOyoN8Zu9Vzw2jvyG31YeetTBYNvqHClXa33O9ZScFfkfyFk68XbWVeJSFHvO0XS29qcMQytwb0s1lY01Go3WW5opBvK",
+  useCdn: false,
+})
 
 const SSO_SECRET = "daymoon"
 const MAX_STACK_HEIGHT = 200
@@ -120,6 +129,7 @@ class Player extends Schema {
 
 class CaseStudy extends Schema {
   @type("string") uuid: string
+  @type("string") caseStudyId: string
   @type("string") name: string
   @type("number") tint: number
   @type("number") age: number
@@ -162,23 +172,31 @@ export class GameRoom extends Room {
   onCreate(options: any) {
     this.setState(new State())
 
-    // Place case studies
-    for (let i = 0; i < 50; i++) {
-      let id = uuidv4()
-      this.state.caseStudies[id] = new CaseStudy()
-      this.state.caseStudies[id].uuid = id
-      this.state.caseStudies[id].name =
-        sample(RANDOM_WORDS) + " " + sample(RANDOM_WORDS)
-      this.state.caseStudies[id].age = 20
-      this.state.caseStudies[id].carriedBy = ""
-      this.state.caseStudies[id].tint = (Math.random() * 0xffffff) << 0
-      this.state.caseStudies[id].x =
-        Math.ceil((Math.floor(Math.random() * (2400 - 1600 + 1)) + 1600) / 10) *
-        10
-      this.state.caseStudies[id].y =
-        Math.ceil((Math.floor(Math.random() * (2000 - 1600 + 1)) + 1600) / 10) *
-        10
-    }
+    client
+      .fetch('*[_type == "caseStudyEmergent"]{title, _id}')
+      .then((posts) => {
+        console.dir(posts)
+        // Place case studies
+        for (let i = 0; i < 50; i++) {
+          let id = uuidv4()
+          let randomCaseStudy = sample(posts)
+          this.state.caseStudies[id] = new CaseStudy()
+          this.state.caseStudies[id].uuid = id
+          this.state.caseStudies[id].name = randomCaseStudy.title
+          this.state.caseStudies[id].caseStudyId = randomCaseStudy._id
+          this.state.caseStudies[id].age = 20
+          this.state.caseStudies[id].carriedBy = ""
+          this.state.caseStudies[id].tint = (Math.random() * 0xffffff) << 0
+          this.state.caseStudies[id].x =
+            Math.ceil(
+              (Math.floor(Math.random() * (2400 - 1600 + 1)) + 1600) / 10
+            ) * 10
+          this.state.caseStudies[id].y =
+            Math.ceil(
+              (Math.floor(Math.random() * (2000 - 1600 + 1)) + 1600) / 10
+            ) * 10
+        }
+      })
 
     this.onMessage("blacklist", (client, payload) => {
       try {

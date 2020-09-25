@@ -17,12 +17,10 @@ import sanity from "@sanity/client"
 const client = sanity({
   projectId: "bu5rnal5",
   dataset: "production",
-  // token:
-  //   "skXhQX58sotVgMSmaKjxbCO95r9A1NWAMLsePFclGzYjyPr8RadgiBcTKX5dniLh0GzTlBGDQxVAX8sjgyz7y7FYPOyoN8Zu9Vzw2jvyG31YeetTBYNvqHClXa33O9ZScFfkfyFk68XbWVeJSFHvO0XS29qcMQytwb0s1lY01Go3WW5opBvK",
   useCdn: false,
 })
 
-const SSO_SECRET = "daymoon"
+const SSO_SECRET = process.env.SSO_SECRET | ""
 const MAX_STACK_HEIGHT = 200
 const MAX_USERNAME_LENGTH = 100
 const MAX_CHATMESSAGE_LENGTH = 1000
@@ -32,6 +30,7 @@ const RANDOM_WORDS = [...colors]
 const rawdata = fs.readFileSync("grid.json")
 const mapMatrix = JSON.parse(rawdata.toString()).data
 
+console.log(SSO_SECRET)
 // mongoose.connect(MONGODB_URI, {
 //   useUnifiedTopology: true,
 //   useNewUrlParser: true,

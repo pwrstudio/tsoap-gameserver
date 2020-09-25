@@ -163,6 +163,10 @@ const calculateDirection = (diffX: Number, diffY: Number) => {
   throw new Error("These differences are not valid: " + diffX + ", " + diffY)
 }
 
+const getRandomInt = (min: number, max: number) =>
+  Math.floor(Math.random() * (Math.floor(max) - Math.ceil(min) + 1)) +
+  Math.ceil(min)
+
 export class GameRoom extends Room {
   autoDispose = false
 
@@ -273,14 +277,14 @@ export class GameRoom extends Room {
         let loResOriginX = originX / 10
         let loResOriginY = originY / 10
 
-        let dx = Math.abs(loResOriginX - loResRoundedX)
-        let dy = Math.abs(loResOriginY - loResRoundedY)
-        let distance = dx + dy
-        if (distance > 150) {
-          console.error("distance too long")
-          client.send("illegalMove", {})
-          return
-        }
+        // let dx = Math.abs(loResOriginX - loResRoundedX)
+        // let dy = Math.abs(loResOriginY - loResRoundedY)
+        // let distance = dx + dy
+        // if (distance > 150) {
+        //   console.error("distance too long")
+        //   client.send("illegalMove", {})
+        //   return
+        // }
 
         console.time("pathfinding")
         easystar.findPath(
@@ -291,9 +295,9 @@ export class GameRoom extends Room {
           (path) => {
             console.timeEnd("pathfinding")
 
-            if (path === null) {
+            if (path === null || path.length == 0) {
               console.error("no path")
-              client.send("illegalMove", {})
+              client.send("illegalMove", "No path found")
             } else {
               console.time("path-processing")
 
@@ -374,7 +378,7 @@ export class GameRoom extends Room {
                 processPath(0)
                 // processFullPath(1)
               } else {
-                client.send("illegalMove", {})
+                client.send("illegalMove", "Empty full path")
               }
             }
           }
@@ -485,12 +489,10 @@ export class GameRoom extends Room {
       try {
         console.dir(payload.uuid)
         console.dir(client.sessionId)
-        this.state.caseStudies[payload.uuid].x = this.state.players[
-          client.sessionId
-        ].x
-        this.state.caseStudies[payload.uuid].y = this.state.players[
-          client.sessionId
-        ].y
+        this.state.caseStudies[payload.uuid].x =
+          this.state.players[client.sessionId].x + getRandomInt(-40, 40)
+        this.state.caseStudies[payload.uuid].y =
+          this.state.players[client.sessionId].y + getRandomInt(-40, 40)
         this.state.caseStudies[payload.uuid].carriedBy = ""
         this.state.players[client.sessionId].carrying = ""
       } catch (err) {

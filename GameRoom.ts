@@ -13,14 +13,15 @@ import { colors } from "unique-names-generator"
 import mongoose from "mongoose"
 import { v4 as uuidv4 } from "uuid"
 import sanity from "@sanity/client"
+import poissonProcess from "poisson-process"
 
-const client = sanity({
+const sanityClient = sanity({
   projectId: "bu5rnal5",
   dataset: "production",
   useCdn: false,
 })
 
-const SSO_SECRET = process.env.SSO_SECRET || ""
+const SSO_SECRET = "nwvSuAVLUE5L"
 const MAX_STACK_HEIGHT = 200
 const MAX_USERNAME_LENGTH = 100
 const MAX_CHATMESSAGE_LENGTH = 1000
@@ -78,12 +79,16 @@ console.log(SSO_SECRET)
 // 3 = red
 // 4 = green
 // 5 = blue
+// 6 = magenta
+// 7 = cyan
+// 8 = purple
+// 9 = teal
 
 const easystar = new EasyStar.js()
 easystar.setGrid(mapMatrix)
-easystar.setAcceptableTiles([0, 2, 3, 4, 5])
-easystar.setTurnPenalty(2)
-easystar.setHeuristicsFactor(3)
+easystar.setAcceptableTiles([0, 2, 3, 4, 5, 6, 7, 8, 9])
+easystar.setTurnPenalty(1)
+easystar.setHeuristicsFactor(2)
 
 class IP extends Schema {
   @type("string") address: string
@@ -114,6 +119,8 @@ class Player extends Schema {
   @type("boolean") npc: boolean
   @type("string") uuid: string
   @type("string") name: string
+  @type("string") discourseName: string
+  @type("string") slug: string
   @type("string") tint: string
   @type("string") ip: string
   @type("string") avatar: string
@@ -131,6 +138,8 @@ class CaseStudy extends Schema {
   @type("string") uuid: string
   @type("string") caseStudyId: string
   @type("string") name: string
+  @type("string") slug: string
+  @type("string") category: string
   @type("number") tint: number
   @type("number") age: number
   @type("number") x: number
@@ -142,10 +151,12 @@ class Message extends Schema {
   @type("string") msgId: string
   @type("string") uuid: string
   @type("string") name: string
+  @type("string") username: string
+  @type("boolean") authenticated: boolean
   @type("string") text: string
   @type("string") tint: string
   @type("number") timestamp: number
-  @type("number") area: number
+  @type("number") room: number
 }
 
 class State extends Schema {
@@ -176,38 +187,64 @@ export class GameRoom extends Room {
   onCreate(options: any) {
     this.setState(new State())
 
-    client
-      .fetch('*[_type == "caseStudyEmergent"]{title, _id}')
-      .then((posts) => {
-        console.dir(posts)
+    sanityClient
+      .fetch('*[_type == "caseStudyEmergent"]{title, _id, slug, category}')
+      .then(posts => {
+        // console.dir(posts)
         // Place case studies
         const createCaseStudy = () => {
-          console.log("–– CREATING ONE CASE STUDY")
+          // console.log("–– CREATING ONE CASE STUDY")
           let id = uuidv4()
           let randomCaseStudy = sample(posts)
+
+          let tint = 0xffffff
+          switch (randomCaseStudy.category) {
+            case "sensing":
+              tint = 0xfff538
+              break
+            case "communication":
+              tint = 0x1cc227
+              break
+            case "consensus-building":
+              tint = 0xa2dafd
+              break
+            case "archiving":
+              tint = 0xf8c2e8
+              break
+          }
+
           this.state.caseStudies[id] = new CaseStudy()
           this.state.caseStudies[id].uuid = id
           this.state.caseStudies[id].name = randomCaseStudy.title
+          this.state.caseStudies[id].category = randomCaseStudy.category
+          this.state.caseStudies[id].slug = get(
+            randomCaseStudy,
+            "slug.current",
+            "no-slug"
+          )
           this.state.caseStudies[id].caseStudyId = randomCaseStudy._id
           this.state.caseStudies[id].age = 10
           this.state.caseStudies[id].carriedBy = ""
-          this.state.caseStudies[id].tint = (Math.random() * 0xffffff) << 0
-          this.state.caseStudies[id].x =
-            Math.ceil(
-              (Math.floor(Math.random() * (2500 - 1500 + 1)) + 1500) / 10
-            ) * 10
-          this.state.caseStudies[id].y =
-            Math.ceil(
-              (Math.floor(Math.random() * (2200 - 1600 + 1)) + 1500) / 10
-            ) * 10
+          this.state.caseStudies[id].tint = tint
+          const theta = Math.random() * 2 * Math.PI
+          const r = 420 * Math.sqrt(Math.random())
+          const x = 2000 + r * Math.cos(theta)
+          const y = 1800 + r * Math.sin(theta)
+          // console.log("X", x)
+          // console.log("Y", y)
+          this.state.caseStudies[id].x = x
+          this.state.caseStudies[id].y = y
         }
 
-        for (let i = 0; i < 50; i++) {
-          createCaseStudy()
-        }
+        const p = poissonProcess.create(10000, () => {
+          if (Object.keys(this.state.caseStudies).length < 600) {
+            createCaseStudy()
+          }
+        })
 
-        // Drop every minute
-        setInterval(createCaseStudy, 20000)
+        p.start()
+      }).catch(err => {
+        console.log(err)
       })
 
     this.onMessage("blacklist", (client, payload) => {
@@ -251,8 +288,8 @@ export class GameRoom extends Room {
     })
 
     this.onMessage("go", (client, message) => {
-      console.log("X", message.x)
-      console.log("Y", message.y)
+      // console.log("X", message.x)
+      // console.log("Y", message.y)
       try {
         let roundedX = clamp(
           Math.ceil(
@@ -297,23 +334,23 @@ export class GameRoom extends Room {
         //   return
         // }
 
-        console.time("pathfinding")
+        // console.time("pathfinding")
         easystar.findPath(
           loResOriginX,
           loResOriginY,
           loResRoundedX,
           loResRoundedY,
-          (path) => {
-            console.timeEnd("pathfinding")
+          path => {
+            // console.timeEnd("pathfinding")
 
             if (path === null || path.length == 0) {
-              console.error("no path")
+              // console.error("no path")
               client.send("illegalMove", "No path found")
             } else {
-              console.time("path-processing")
+              // console.time("path-processing")
 
               let fullPath = new Path()
-              path.forEach((wp) => {
+              path.forEach(wp => {
                 fullPath.waypoints.push(
                   new Waypoint(wp.x * 10, wp.y * 10, mapMatrix[wp.y][wp.x])
                 )
@@ -373,7 +410,7 @@ export class GameRoom extends Room {
                     }
                   }
 
-                  console.timeEnd("path-processing")
+                  // console.timeEnd("path-processing")
                   this.state.players[client.sessionId].x = currentWaypoint.x
                   this.state.players[client.sessionId].y = currentWaypoint.y
                   this.state.players[client.sessionId].path = extendedPath
@@ -403,7 +440,7 @@ export class GameRoom extends Room {
     })
 
     this.onMessage("teleport", (client, message) => {
-      console.dir(message)
+      // console.dir(message)
 
       if (message.area) {
         let newX = 0
@@ -414,8 +451,12 @@ export class GameRoom extends Room {
         else if (message.area == "blue") colorIndex = 5
         else if (message.area == "yellow") colorIndex = 2
         else if (message.area == "red") colorIndex = 3
-
-        console.log(colorIndex)
+        else if (message.area == "magenta") colorIndex = 6
+        else if (message.area == "cyan") colorIndex = 7
+        else if (message.area == "purple") colorIndex = 8
+        else if (message.area == "teal") colorIndex = 9
+        
+        // console.log(colorIndex)
 
         while (true) {
           newX =
@@ -427,11 +468,11 @@ export class GameRoom extends Room {
           if (mapMatrix[newY / 10][newX / 10] == colorIndex) break
         }
 
-        console.log("TELEPORT")
-        console.log("area", mapMatrix[newY / 10][newX / 10])
-        console.log("=> Y", newY)
-        console.log("=> X", newX)
-        console.log("- - - - - ")
+        // console.log("TELEPORT")
+        // console.log("area", mapMatrix[newY / 10][newX / 10])
+        // console.log("=> Y", newY)
+        // console.log("=> X", newX)
+        // console.log("- - - - - ")
 
         this.state.players[client.sessionId].area = colorIndex
         this.state.players[client.sessionId].path = new Path()
@@ -451,9 +492,12 @@ export class GameRoom extends Room {
           newMessage.msgId = get(payload, "msgId", "No msgId")
           newMessage.text = payload.text.substring(0, MAX_CHATMESSAGE_LENGTH)
           newMessage.name = get(payload, "name", "No name")
+          newMessage.username = get(payload, "username", "")
+          newMessage.authenticated = get(payload, "authenticated",false)
           newMessage.uuid = get(payload, "uuid", "No UUID")
           newMessage.tint = get(payload, "tint", "No tint")
-          newMessage.area = get(payload, "area", 4)
+          newMessage.room = get(payload, "room", 2)
+
           newMessage.timestamp = Date.now()
           this.state.messages.push(newMessage)
           // Write to DB
@@ -486,7 +530,7 @@ export class GameRoom extends Room {
 
     this.onMessage("pickUpCaseStudy", (client, payload) => {
       try {
-        console.log("AGE", this.state.caseStudies[payload.uuid].age)
+        // console.log("AGE", this.state.caseStudies[payload.uuid].age)
         this.state.caseStudies[payload.uuid].carriedBy = client.sessionId
         this.state.caseStudies[payload.uuid].age -= 1
         this.state.players[client.sessionId].carrying = payload.uuid
@@ -498,16 +542,16 @@ export class GameRoom extends Room {
 
     this.onMessage("dropCaseStudy", (client, payload) => {
       try {
-        console.dir(payload.uuid)
-        console.dir(client.sessionId)
+        // console.dir(payload.uuid)
+        // console.dir(client.sessionId)
         this.state.players[client.sessionId].carrying = ""
         if (this.state.caseStudies[payload.uuid].age == 0) {
           delete this.state.caseStudies[payload.uuid]
         } else {
           this.state.caseStudies[payload.uuid].x =
-            this.state.players[client.sessionId].x + getRandomInt(-40, 40)
+            this.state.players[client.sessionId].x + getRandomInt(-20, 20)
           this.state.caseStudies[payload.uuid].y =
-            this.state.players[client.sessionId].y + getRandomInt(-40, 40)
+            this.state.players[client.sessionId].y + getRandomInt(-20, 20)
           this.state.caseStudies[payload.uuid].carriedBy = ""
         }
       } catch (err) {
@@ -517,45 +561,58 @@ export class GameRoom extends Room {
     })
   }
 
-  onAuth(client: Client, options: any, request: any) {
-    if (
-      !this.state.blacklist.find(
-        (ip: IP) => ip.address == request.connection.remoteAddress
-      )
-    ) {
-      console.dir(options)
+  onAuth(client: Client, options: any, request: any): Promise<any> {
+    return new Promise((resolve, reject) => {
+      if (
+        !this.state.blacklist.find(
+          (ip: IP) => ip.address == request.connection.remoteAddress
+        )
+      ) {
 
-      options.ip = get(request, "connection.remoteAddress", "6.6.6.6")
+        console.dir(options)
+        options.ip = get(request, "connection.remoteAddress", "6.6.6.6")
 
-      if (options.sso && options.sig) {
-        console.log("Authenticate accredited user")
-        const hmac = crypto.createHmac("sha256", SSO_SECRET)
-        const decoded_sso = decodeURIComponent(options.sso)
-        hmac.update(decoded_sso)
-        const hash = hmac.digest("hex")
-        if (options.sig == hash) {
-          const b = Buffer.from(options.sso, "base64")
-          const inner_qstring = b.toString("utf8")
-          const ret = querystring.parse(inner_qstring)
-          console.dir(ret)
-          // options.uuid = ret.username
-          options.name = ret.name || ret.username
-          delete options.sso
-          delete options.sig
-          options.authenticated = true
-          return true
+        if (options.sso && options.sig) {
+          console.log("Authenticate accredited user")
+          const hmac = crypto.createHmac("sha256", SSO_SECRET)
+          const decoded_sso = decodeURIComponent(options.sso)
+          hmac.update(decoded_sso)
+          const hash = hmac.digest("hex")
+          if (options.sig == hash) {
+            const b = Buffer.from(options.sso, "base64")
+            const inner_qstring = b.toString("utf8")
+            const ret = querystring.parse(inner_qstring)
+            console.dir(ret)
+            // options.uuid = ret.username
+            sanityClient
+              .fetch('*[_type == "participant" && username == $u][0]', {u: ret.username})
+              .then(user => {
+                console.dir(user)
+                options.discourseName = ret.username || "no-user-name"
+                options.name = ret.name || ret.username
+                options.avatar = user.avatarLink._ref
+                delete options.sso
+                delete options.sig
+                options.authenticated = true
+                resolve(true);
+              }).catch(err => {
+                reject(err); // sanity load failed
+              })
+          } else {
+            reject(); // discourse auth failed
+          }
+        } else {
+          resolve(true); 
         }
-        return false
       } else {
-        return true
+        console.log("BANNED")
+        reject(); // on black list
       }
-    } else {
-      console.log("BANNED")
-      return false
-    }
+    })
   }
 
   onJoin(client: Client, options: any) {
+    console.log('___ join')
     console.dir(options)
 
     if (!options.moderator) {
@@ -578,7 +635,9 @@ export class GameRoom extends Room {
         randomAdjective =
           randomAdjective.charAt(0).toUpperCase() + randomAdjective.slice(1)
         const userName =
-          (!get(options, "authenticated", false) ? randomAdjective + " " : "") +
+          (!get(options, "authenticated", false) && !get(options, "npc", false)
+            ? randomAdjective + " "
+            : "") +
           get(options, "name", "Undefined name").substring(
             0,
             MAX_USERNAME_LENGTH
@@ -594,6 +653,16 @@ export class GameRoom extends Room {
           "0XFF0000"
         )
         this.state.players[client.sessionId].name = userName
+        this.state.players[client.sessionId].slug = get(
+          options,
+          "slug",
+          "no-slug"
+        )
+        this.state.players[client.sessionId].discourseName = get(
+          options,
+          "discourseName",
+          "no-discourse-name"
+        )
         this.state.players[client.sessionId].uuid = get(
           options,
           "uuid",
@@ -610,6 +679,9 @@ export class GameRoom extends Room {
         this.state.players[client.sessionId].y = startY
         this.state.players[client.sessionId].area =
           mapMatrix[startY / 10][startX / 10]
+
+        // console.log("NEW USER")
+        // console.dir(this.state.players[client.sessionId])
       } catch (err) {
         console.log(err)
         Sentry.captureException(err)
@@ -618,7 +690,6 @@ export class GameRoom extends Room {
   }
 
   async onLeave(client: Client, consented: boolean) {
-    console.log("LEFT")
     delete this.state.players[client.sessionId]
   }
 

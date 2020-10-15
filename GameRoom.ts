@@ -31,7 +31,6 @@ const RANDOM_WORDS = [...colors]
 const rawdata = fs.readFileSync("grid.json")
 const mapMatrix = JSON.parse(rawdata.toString()).data
 
-console.log(SSO_SECRET)
 // mongoose.connect(MONGODB_URI, {
 //   useUnifiedTopology: true,
 //   useNewUrlParser: true,
@@ -84,6 +83,7 @@ console.log(SSO_SECRET)
 // 8 = purple
 // 9 = teal
 
+// __ Setup collision grid
 const easystar = new EasyStar.js()
 easystar.setGrid(mapMatrix)
 easystar.setAcceptableTiles([0, 2, 3, 4, 5, 6, 7, 8, 9])
@@ -180,23 +180,21 @@ const getRandomInt = (min: number, max: number) =>
   Math.ceil(min)
 
 export class GameRoom extends Room {
+  // __ Global settings
   autoDispose = false
-
   maxClients = 500
 
   onCreate(options: any) {
     this.setState(new State())
 
+    // __ Get case studies from CMS
     sanityClient
       .fetch('*[_type == "caseStudyEmergent"]{title, _id, slug, category}')
       .then(posts => {
-        // console.dir(posts)
-        // Place case studies
+        // __ Place case studies
         const createCaseStudy = () => {
-          // console.log("–– CREATING ONE CASE STUDY")
-          let id = uuidv4()
-          let randomCaseStudy = sample(posts)
-
+          const id = uuidv4()
+          const randomCaseStudy = sample(posts)
           let tint = 0xffffff
           switch (randomCaseStudy.category) {
             case "sensing":
@@ -212,7 +210,6 @@ export class GameRoom extends Room {
               tint = 0xf8c2e8
               break
           }
-
           this.state.caseStudies[id] = new CaseStudy()
           this.state.caseStudies[id].uuid = id
           this.state.caseStudies[id].name = randomCaseStudy.title
@@ -226,40 +223,42 @@ export class GameRoom extends Room {
           this.state.caseStudies[id].age = 10
           this.state.caseStudies[id].carriedBy = ""
           this.state.caseStudies[id].tint = tint
+          // __ Drop within circle
           const theta = Math.random() * 2 * Math.PI
           const r = 420 * Math.sqrt(Math.random())
           const x = 2000 + r * Math.cos(theta)
           const y = 1800 + r * Math.sin(theta)
-          // console.log("X", x)
-          // console.log("Y", y)
           this.state.caseStudies[id].x = x
           this.state.caseStudies[id].y = y
         }
-
+        // __ Drop at random intervals
         const p = poissonProcess.create(10000, () => {
+          // __ Limit to 600 case studies
           if (Object.keys(this.state.caseStudies).length < 600) {
             createCaseStudy()
           }
         })
-
         p.start()
       }).catch(err => {
         console.log(err)
       })
 
+    // __ Blacklist IP address
     this.onMessage("blacklist", (client, payload) => {
       try {
         if (
           !this.state.blacklist.find((ip: IP) => ip.address == payload.address)
         ) {
+          // __ Add IP to list
           let newIP = new IP()
           newIP.address = payload.address
           this.state.blacklist.push(newIP)
+          // __ Check if user with IP exists
+          // __ if so, kick out
           for (let key in this.state.players) {
             if (this.state.players[key].ip == newIP.address) {
               let bannedClient = this.clients.find((c: Client) => c.id === key)
               if (bannedClient) {
-                console.log("BANNED:", bannedClient.id)
                 bannedClient.send("banned")
                 bannedClient.leave()
               }
@@ -273,6 +272,7 @@ export class GameRoom extends Room {
       }
     })
 
+    // __ Remove IP address from blacklist
     this.onMessage("whitelist", (client, payload) => {
       try {
         let newIP = new IP()
@@ -287,10 +287,11 @@ export class GameRoom extends Room {
       }
     })
 
+    // __ Move user to point
     this.onMessage("go", (client, message) => {
-      // console.log("X", message.x)
-      // console.log("Y", message.y)
       try {
+        // __ Round target point
+        // __ Make sure target point is within world bounds
         let roundedX = clamp(
           Math.ceil(
             get(message, "x", this.state.players[client.sessionId].x) / 10
@@ -307,7 +308,8 @@ export class GameRoom extends Room {
         )
         let loResRoundedX = roundedX / 10
         let loResRoundedY = roundedY / 10
-
+        // __ Round origin point
+        // __ Make sure origin point is within world bounds
         let originX = clamp(
           Math.ceil(
             get(message, "originX", this.state.players[client.sessionId].x) / 10
@@ -324,38 +326,22 @@ export class GameRoom extends Room {
         )
         let loResOriginX = originX / 10
         let loResOriginY = originY / 10
-
-        // let dx = Math.abs(loResOriginX - loResRoundedX)
-        // let dy = Math.abs(loResOriginY - loResRoundedY)
-        // let distance = dx + dy
-        // if (distance > 150) {
-        //   console.error("distance too long")
-        //   client.send("illegalMove", {})
-        //   return
-        // }
-
-        // console.time("pathfinding")
+        // __ Set up pathfinding
         easystar.findPath(
           loResOriginX,
           loResOriginY,
           loResRoundedX,
           loResRoundedY,
           path => {
-            // console.timeEnd("pathfinding")
-
             if (path === null || path.length == 0) {
-              // console.error("no path")
               client.send("illegalMove", "No path found")
             } else {
-              // console.time("path-processing")
-
               let fullPath = new Path()
               path.forEach(wp => {
                 fullPath.waypoints.push(
                   new Waypoint(wp.x * 10, wp.y * 10, mapMatrix[wp.y][wp.x])
                 )
               })
-
               const SIMPLIFICATION_FACTOR = 1
               let finalPath = new Path()
 
@@ -371,7 +357,7 @@ export class GameRoom extends Room {
                   fullPath.waypoints[index].y,
                   fullPath.waypoints[index].area
                 )
-
+                // __ Calculate direction
                 const delta_x =
                   currentWaypoint.x - fullPath.waypoints[prevIndex].x
                 const delta_y =
@@ -410,7 +396,6 @@ export class GameRoom extends Room {
                     }
                   }
 
-                  // console.timeEnd("path-processing")
                   this.state.players[client.sessionId].x = currentWaypoint.x
                   this.state.players[client.sessionId].y = currentWaypoint.y
                   this.state.players[client.sessionId].path = extendedPath
@@ -424,14 +409,13 @@ export class GameRoom extends Room {
 
               if (fullPath.waypoints.length > 0) {
                 processPath(0)
-                // processFullPath(1)
               } else {
                 client.send("illegalMove", "Empty full path")
               }
             }
           }
         )
-
+        // __ Calculate path
         easystar.calculate()
       } catch (err) {
         console.log(err)
@@ -439,13 +423,11 @@ export class GameRoom extends Room {
       }
     })
 
+    // __ Teleport user to point
     this.onMessage("teleport", (client, message) => {
-      // console.dir(message)
-
       if (message.area) {
         let newX = 0
         let newY = 0
-
         let colorIndex = 0
         if (message.area == "green") colorIndex = 4
         else if (message.area == "blue") colorIndex = 5
@@ -455,9 +437,7 @@ export class GameRoom extends Room {
         else if (message.area == "cyan") colorIndex = 7
         else if (message.area == "purple") colorIndex = 8
         else if (message.area == "teal") colorIndex = 9
-        
-        // console.log(colorIndex)
-
+        // __ Get random point until it is with in required color area
         while (true) {
           newX =
             Math.ceil((Math.floor(Math.random() * (3950 - 50 + 1)) + 50) / 10) *
@@ -467,13 +447,6 @@ export class GameRoom extends Room {
             10
           if (mapMatrix[newY / 10][newX / 10] == colorIndex) break
         }
-
-        // console.log("TELEPORT")
-        // console.log("area", mapMatrix[newY / 10][newX / 10])
-        // console.log("=> Y", newY)
-        // console.log("=> X", newX)
-        // console.log("- - - - - ")
-
         this.state.players[client.sessionId].area = colorIndex
         this.state.players[client.sessionId].path = new Path()
         this.state.players[client.sessionId].fullPath = new Path()
@@ -482,6 +455,7 @@ export class GameRoom extends Room {
       }
     })
 
+    // __ Add chat message
     this.onMessage("submitChatMessage", (client, payload) => {
       try {
         if (payload.text && payload.text.length > 0) {
@@ -497,7 +471,6 @@ export class GameRoom extends Room {
           newMessage.uuid = get(payload, "uuid", "No UUID")
           newMessage.tint = get(payload, "tint", "No tint")
           newMessage.room = get(payload, "room", 2)
-
           newMessage.timestamp = Date.now()
           this.state.messages.push(newMessage)
           // Write to DB
@@ -514,6 +487,7 @@ export class GameRoom extends Room {
       }
     })
 
+    // __ Remove chat message
     this.onMessage("removeChatMessage", (client, payload) => {
       try {
         let targetMessageIndex = this.state.messages.findIndex(
@@ -528,22 +502,24 @@ export class GameRoom extends Room {
       }
     })
 
+    // __ Pick up case study
     this.onMessage("pickUpCaseStudy", (client, payload) => {
       try {
-        // console.log("AGE", this.state.caseStudies[payload.uuid].age)
-        this.state.caseStudies[payload.uuid].carriedBy = client.sessionId
-        this.state.caseStudies[payload.uuid].age -= 1
-        this.state.players[client.sessionId].carrying = payload.uuid
+        if(this.state.caseStudies[payload.uuid]) {
+          this.state.caseStudies[payload.uuid].carriedBy = client.sessionId
+          this.state.players[client.sessionId].carrying = payload.uuid
+          // __ Age by one unit
+          this.state.caseStudies[payload.uuid].age -= 1
+        }
       } catch (err) {
         console.log(err)
         Sentry.captureException(err)
       }
     })
 
+    // __ Drop case study
     this.onMessage("dropCaseStudy", (client, payload) => {
       try {
-        // console.dir(payload.uuid)
-        // console.dir(client.sessionId)
         this.state.players[client.sessionId].carrying = ""
         if (this.state.caseStudies[payload.uuid].age == 0) {
           delete this.state.caseStudies[payload.uuid]
@@ -561,35 +537,36 @@ export class GameRoom extends Room {
     })
   }
 
+  // __ Authenticate user
   onAuth(client: Client, options: any, request: any): Promise<any> {
     return new Promise((resolve, reject) => {
+      // __ Check if IP is on blacklist
       if (
         !this.state.blacklist.find(
           (ip: IP) => ip.address == request.connection.remoteAddress
         )
       ) {
-
-        console.dir(options)
+        // __ Set IP
         options.ip = get(request, "connection.remoteAddress", "6.6.6.6")
-
+        // __ If user is accredited
         if (options.sso && options.sig) {
           console.log("Authenticate accredited user")
           const hmac = crypto.createHmac("sha256", SSO_SECRET)
           const decoded_sso = decodeURIComponent(options.sso)
           hmac.update(decoded_sso)
           const hash = hmac.digest("hex")
+          // __ Accredited authentication successful
           if (options.sig == hash) {
             const b = Buffer.from(options.sso, "base64")
             const inner_qstring = b.toString("utf8")
             const ret = querystring.parse(inner_qstring)
-            console.dir(ret)
-            // options.uuid = ret.username
             sanityClient
               .fetch('*[_type == "participant" && username == $u][0]', {u: ret.username})
               .then(user => {
                 console.dir(user)
                 options.discourseName = ret.username || "no-user-name"
                 options.name = ret.name || ret.username
+                // __ Set selected avatar from CMS
                 options.avatar = user.avatarLink._ref
                 delete options.sso
                 delete options.sig
@@ -611,15 +588,14 @@ export class GameRoom extends Room {
     })
   }
 
+  // __ Join user
   onJoin(client: Client, options: any) {
-    console.log('___ join')
-    console.dir(options)
-
+    // __ Make exception for moderator dashboard user
     if (!options.moderator) {
       try {
         let startX = 0
         let startY = 0
-
+        // __ Get point in start area
         while (true) {
           startX =
             Math.ceil((Math.floor(Math.random() * (3950 - 50 + 1)) + 50) / 10) *
@@ -679,9 +655,6 @@ export class GameRoom extends Room {
         this.state.players[client.sessionId].y = startY
         this.state.players[client.sessionId].area =
           mapMatrix[startY / 10][startX / 10]
-
-        // console.log("NEW USER")
-        // console.dir(this.state.players[client.sessionId])
       } catch (err) {
         console.log(err)
         Sentry.captureException(err)
@@ -689,10 +662,12 @@ export class GameRoom extends Room {
     }
   }
 
+  // __ Leave user
   async onLeave(client: Client, consented: boolean) {
     delete this.state.players[client.sessionId]
   }
 
+  // __ Dispose game room
   onDispose() {
     console.log("game room disposed")
   }

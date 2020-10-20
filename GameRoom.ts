@@ -234,7 +234,7 @@ export class GameRoom extends Room {
         // __ Drop at random intervals
         const p = poissonProcess.create(10000, () => {
           // __ Limit to 600 case studies
-          if (Object.keys(this.state.caseStudies).length < 600) {
+          if (this.state.caseStudies.size < 600) {
             createCaseStudy()
           }
         })
@@ -255,7 +255,8 @@ export class GameRoom extends Room {
           this.state.blacklist.push(newIP)
           // __ Check if user with IP exists
           // __ if so, kick out
-          for (let key in this.state.players) {
+          // for (let key in this.state.players) {
+          this.state.players.forEach((value: Player, key: string) => {
             if (this.state.players[key].ip == newIP.address) {
               let bannedClient = this.clients.find((c: Client) => c.id === key)
               if (bannedClient) {
@@ -264,7 +265,7 @@ export class GameRoom extends Room {
               }
               delete this.state.players[key]
             }
-          }
+          })
         }
       } catch (err) {
         console.log(err)
@@ -289,6 +290,7 @@ export class GameRoom extends Room {
 
     // __ Move user to point
     this.onMessage("go", (client, message) => {
+      // console.log('go recieved')
       try {
         // __ Round target point
         // __ Make sure target point is within world bounds
@@ -401,6 +403,8 @@ export class GameRoom extends Room {
                   this.state.players[client.sessionId].area = currentWaypoint.area
                   this.state.players[client.sessionId].path = extendedPath
                   this.state.players[client.sessionId].fullPath = fullPath
+
+                  // console.dir(extendedPath.waypoints)
 
                   return
                 } else {
@@ -674,6 +678,7 @@ export class GameRoom extends Room {
 
   // __ Leave user
   async onLeave(client: Client, consented: boolean) {
+    console.log('A PLAYER LEFT')
     delete this.state.players[client.sessionId]
   }
 

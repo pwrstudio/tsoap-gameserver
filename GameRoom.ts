@@ -398,6 +398,7 @@ export class GameRoom extends Room {
 
                   this.state.players[client.sessionId].x = currentWaypoint.x
                   this.state.players[client.sessionId].y = currentWaypoint.y
+                  this.state.players[client.sessionId].area = currentWaypoint.area
                   this.state.players[client.sessionId].path = extendedPath
                   this.state.players[client.sessionId].fullPath = fullPath
 
@@ -489,12 +490,17 @@ export class GameRoom extends Room {
 
     // __ Remove chat message
     this.onMessage("removeChatMessage", (client, payload) => {
+      console.dir(payload)
+      let targetMessage = this.state.messages.find((m: Message) => m.msgId == payload.msgId)
+      console.dir(targetMessage)
       try {
         let targetMessageIndex = this.state.messages.findIndex(
-          (m: Message) => m.msgId == payload.msgId
+          (m: Message) => m == targetMessage
         )
+        console.log(targetMessageIndex)
         if (isNumber(targetMessageIndex)) {
           this.state.messages.splice(targetMessageIndex, 1)
+          this.broadcast("nukeMessage", targetMessage.msgId);
         }
       } catch (err) {
         console.log(err)
@@ -520,15 +526,19 @@ export class GameRoom extends Room {
     // __ Drop case study
     this.onMessage("dropCaseStudy", (client, payload) => {
       try {
-        this.state.players[client.sessionId].carrying = ""
-        if (this.state.caseStudies[payload.uuid].age == 0) {
-          delete this.state.caseStudies[payload.uuid]
+        if(this.state.caseStudies[payload.uuid]) {
+          this.state.players[client.sessionId].carrying = ""
+          if (this.state.caseStudies[payload.uuid].age == 0) {
+            delete this.state.caseStudies[payload.uuid]
+          } else {
+            this.state.caseStudies[payload.uuid].x =
+              this.state.players[client.sessionId].x + getRandomInt(-20, 20)
+            this.state.caseStudies[payload.uuid].y =
+              this.state.players[client.sessionId].y + getRandomInt(-20, 20)
+            this.state.caseStudies[payload.uuid].carriedBy = ""
+          }
         } else {
-          this.state.caseStudies[payload.uuid].x =
-            this.state.players[client.sessionId].x + getRandomInt(-20, 20)
-          this.state.caseStudies[payload.uuid].y =
-            this.state.players[client.sessionId].y + getRandomInt(-20, 20)
-          this.state.caseStudies[payload.uuid].carriedBy = ""
+          console.log('!!! Case study does not exist')
         }
       } catch (err) {
         console.log(err)
@@ -543,11 +553,11 @@ export class GameRoom extends Room {
       // __ Check if IP is on blacklist
       if (
         !this.state.blacklist.find(
-          (ip: IP) => ip.address == request.connection.remoteAddress
+          (ip: IP) => ip.address == request.headers['x-real-ip']
         )
       ) {
         // __ Set IP
-        options.ip = get(request, "connection.remoteAddress", "6.6.6.6")
+        options.ip = request.headers['x-real-ip'] || request.connection.remoteAddress || "6.6.6.6"
         // __ If user is accredited
         if (options.sso && options.sig) {
           console.log("Authenticate accredited user")

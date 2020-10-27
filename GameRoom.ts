@@ -31,45 +31,60 @@ const RANDOM_WORDS = [...colors]
 const rawdata = fs.readFileSync("grid.json")
 const mapMatrix = JSON.parse(rawdata.toString()).data
 
-// mongoose.connect(MONGODB_URI, {
-//   useUnifiedTopology: true,
-//   useNewUrlParser: true,
-// })
+mongoose.connect(MONGODB_URI, {
+  useUnifiedTopology: true,
+  useNewUrlParser: true,
+})
 
-// const connection = mongoose.connection
-// const MongoSchema = mongoose.Schema
-// const message = new MongoSchema(
-//   {
-//     text: {
-//       type: String,
-//     },
-//     uuid: {
-//       type: String,
-//     },
-//     name: {
-//       type: String,
-//     },
-//     msgId: {
-//       type: String,
-//     },
-//     tint: {
-//       type: String,
-//     },
-//     timestamp: {
-//       type: Number,
-//     },
-//     area: {
-//       type: Number,
-//     },
-//   },
-//   { collection: "Messages" }
-// )
+const connection = mongoose.connection
+const MongoSchema = mongoose.Schema
+const message = new MongoSchema(
+  {
+    text: {
+      type: String,
+    },
+    uuid: {
+      type: String,
+    },
+    name: {
+      type: String,
+    },
+    username: {
+      type: String,
+    },
+    authenticaed: {
+      type: Boolean,
+    },
+    directed: {
+      type: Boolean,
+    },
+    directedTo: {
+      type: String,
+    },
+    msgId: {
+      type: String,
+    },
+    tint: {
+      type: String,
+    },
+    timestamp: {
+      type: Number,
+    },
+    room: {
+      type: Number,
+    },
+    removed: {
+      type: Boolean,
+    },
+  },
+  { collection: "Messages" }
+)
 
-// const MongoMessage = mongoose.model("Message", message)
+const MongoMessage = mongoose.model("Message", message)
 
-// connection.once("open", () => {
-//   console.log("MongoDB database connection established successfully")
-// })
+connection.once("open", () => {
+  console.log("MongoDB database connection established successfully")
+})
 
 // TILE TYPES =>
 // 0 = white
@@ -145,6 +160,7 @@ class CaseStudy extends Schema {
   @type("number") x: number
   @type("number") y: number
   @type("string") carriedBy: string
+  @type("number") timestamp: number
 }
 
 class Message extends Schema {
@@ -153,6 +169,8 @@ class Message extends Schema {
   @type("string") name: string
   @type("string") username: string
   @type("boolean") authenticated: boolean
+  @type("boolean") directed: boolean
+  @type("string") directedTo: string
   @type("string") text: string
   @type("string") tint: string
   @type("number") timestamp: number
@@ -223,6 +241,7 @@ export class GameRoom extends Room {
           this.state.caseStudies[id].age = 10
           this.state.caseStudies[id].carriedBy = ""
           this.state.caseStudies[id].tint = tint
+          this.state.caseStudies[id].timestamp = Date.now()
           // __ Drop within circle
           const theta = Math.random() * 2 * Math.PI
           const r = 420 * Math.sqrt(Math.random())
@@ -233,8 +252,9 @@ export class GameRoom extends Room {
         }
         // __ Drop at random intervals
         const p = poissonProcess.create(10000, () => {
+          console.log('Dropping case study... Total:', this.state.caseStudies.size)
           // __ Limit to 600 case studies
-          if (this.state.caseStudies.size < 600) {
+          if (this.state.caseStudies.size < 1000) {
             createCaseStudy()
           }
         })
@@ -242,6 +262,34 @@ export class GameRoom extends Room {
       }).catch(err => {
         console.log(err)
       })
+
+      // __ Restore messages from database
+      // __ 1 => GET LAST 20 MESSAGES (that are not removed and not broad- or narrowcast) sorted by timestamp
+      const restoreMessages = async () => {
+        console.log('Restoring messages...')
+        const messagesToRestore = await MongoMessage.find().sort({ timestamp: 'desc'});
+        console.dir(messagesToRestore)
+        console.log('Number of messages:', messagesToRestore.length)
+        // // __ 2 => WRITE TO MESSAGE STATE
+        messagesToRestore.reverse().forEach((m) => {
+          let newMessage = new Message()
+          newMessage.msgId = get(m, "msgId", "No msgId")
+          newMessage.text = get(m, 'text', '')
+          newMessage.name = get(m, "name", "No name")
+          newMessage.username = get(m, "username", "")
+          newMessage.directed = get(m, "directed", false)
+          newMessage.directedTo = get(m, "directedTo",'')
+          newMessage.authenticated = get(m, "authenticated",false)
+          newMessage.uuid = get(m, "uuid", "No UUID")
+          newMessage.tint = get(m, "tint", "No tint")
+          newMessage.room = get(m, "room", 2)
+          newMessage.timestamp = get(m, "timestamp", Date.now())
+          // console.log('==> Write message', m.msgId)
+          // console.dir(newMessage)
+          this.state.messages.push(newMessage)
+        })
+      }
+      restoreMessages()
 
     // __ Blacklist IP address
     this.onMessage("blacklist", (client, payload) => {
@@ -472,6 +520,8 @@ export class GameRoom extends Room {
           newMessage.text = payload.text.substring(0, MAX_CHATMESSAGE_LENGTH)
           newMessage.name = get(payload, "name", "No name")
           newMessage.username = get(payload, "username", "")
+          newMessage.directed = get(payload, "directed", false)
+          newMessage.directedTo = get(payload, "directedTo",'')
           newMessage.authenticated = get(payload, "authenticated",false)
           newMessage.uuid = get(payload, "uuid", "No UUID")
           newMessage.tint = get(payload, "tint", "No tint")
@@ -479,12 +529,12 @@ export class GameRoom extends Room {
           newMessage.timestamp = Date.now()
           this.state.messages.push(newMessage)
           // Write to DB
-          // let messageToMongo = new MongoMessage(newMessage)
-          // messageToMongo.save((err) => {
-          //   if (err) {
-          //     console.error(err)
-          //   }
-          // })
+          const messageToMongo = new MongoMessage(newMessage)
+          messageToMongo.save((err) => {
+            if (err) {
+              console.error(err)
+            }
+          })
         }
       } catch (err) {
         console.log(err)
@@ -504,6 +554,7 @@ export class GameRoom extends Room {
         console.log(targetMessageIndex)
         if (isNumber(targetMessageIndex)) {
           this.state.messages.splice(targetMessageIndex, 1)
+          // !!! TODO: MARK MESSAGE AS REMOVED IN DATABASE
           this.broadcast("nukeMessage", targetMessage.msgId);
         }
       } catch (err) {

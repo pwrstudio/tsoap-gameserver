@@ -272,21 +272,23 @@ export class GameRoom extends Room {
         console.log('Number of messages:', messagesToRestore.length)
         // // __ 2 => WRITE TO MESSAGE STATE
         messagesToRestore.reverse().forEach((m) => {
-          let newMessage = new Message()
-          newMessage.msgId = get(m, "msgId", "No msgId")
-          newMessage.text = get(m, 'text', '')
-          newMessage.name = get(m, "name", "No name")
-          newMessage.username = get(m, "username", "")
-          newMessage.directed = get(m, "directed", false)
-          newMessage.directedTo = get(m, "directedTo",'')
-          newMessage.authenticated = get(m, "authenticated",false)
-          newMessage.uuid = get(m, "uuid", "No UUID")
-          newMessage.tint = get(m, "tint", "No tint")
-          newMessage.room = get(m, "room", 2)
-          newMessage.timestamp = get(m, "timestamp", Date.now())
-          // console.log('==> Write message', m.msgId)
-          // console.dir(newMessage)
-          this.state.messages.push(newMessage)
+          if(!get(m, 'removed', false)) {
+            let newMessage = new Message()
+            newMessage.msgId = get(m, "msgId", "No msgId")
+            newMessage.text = get(m, 'text', '')
+            newMessage.name = get(m, "name", "No name")
+            newMessage.username = get(m, "username", "")
+            newMessage.directed = get(m, "directed", false)
+            newMessage.directedTo = get(m, "directedTo",'')
+            newMessage.authenticated = get(m, "authenticated",false)
+            newMessage.uuid = get(m, "uuid", "No UUID")
+            newMessage.tint = get(m, "tint", "No tint")
+            newMessage.room = get(m, "room", 2)
+            newMessage.timestamp = get(m, "timestamp", Date.now())
+            // console.log('==> Write message', m.msgId)
+            // console.dir(newMessage)
+            this.state.messages.push(newMessage)
+          }
         })
       }
       restoreMessages()
@@ -555,6 +557,14 @@ export class GameRoom extends Room {
         if (isNumber(targetMessageIndex)) {
           this.state.messages.splice(targetMessageIndex, 1)
           // !!! TODO: MARK MESSAGE AS REMOVED IN DATABASE
+          console.log('mark as removed', targetMessage.msgId)
+          // MongoMessage.findOne({ msgId: targetMessage.msgId }, (err, message) => {
+          //   message.removed = true;
+
+          // });
+          MongoMessage.updateOne({ msgId: targetMessage.msgId }, {
+            removed: true
+          });
           this.broadcast("nukeMessage", targetMessage.msgId);
         }
       } catch (err) {
@@ -730,7 +740,22 @@ export class GameRoom extends Room {
   // __ Leave user
   async onLeave(client: Client, consented: boolean) {
     console.log('A PLAYER LEFT')
-    delete this.state.players[client.sessionId]
+    // flag client as inactive for other users
+    this.state.players[client.sessionId].connected = false;
+    try {
+      if (consented) {
+        throw new Error("consented leave");
+      }
+      // allow disconnected client to reconnect into this room until 20 seconds
+      await this.allowReconnection(client, 20);
+      // client returned! let's re-activate it.
+      console.log('--- wait 20s')
+      this.state.players[client.sessionId].connected = true;
+    } catch (e) {
+      // 20 seconds expired. let's remove the client.
+      console.log('--- left for good')
+      delete this.state.players[client.sessionId];
+    }
   }
 
   // __ Dispose game room
